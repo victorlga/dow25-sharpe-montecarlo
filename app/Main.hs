@@ -16,9 +16,13 @@ import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
 
 type Ticker = BS.ByteString
+
 type DailyReturn = Float
+
 type SharpeRatio = Float
+
 type Weight = Float
+
 type Price = Float
 
 data Stock = Stock
@@ -82,16 +86,17 @@ mean xs = if null xs then 0 else sum xs / fromIntegral (length xs)
 covariance :: [Float] -> [Float] -> Float
 covariance xs ys
   | null xs || null ys || length xs == 1 = 0
-  | otherwise = let mx = mean xs
-                    my = mean ys
-                    n = fromIntegral (length xs)
-                in sum (zipWith (\x y -> (x - mx) * (y - my)) xs ys) / (n - 1)
+  | otherwise =
+      let mx = mean xs
+          my = mean ys
+          n = fromIntegral (length xs)
+       in sum (zipWith (\x y -> (x - mx) * (y - my)) xs ys) / (n - 1)
 
 computeAnnualizedReturn :: [[DailyReturn]] -> [Weight] -> Float
 computeAnnualizedReturn dailyReturns weights =
   let portfolioReturns = map (weightedReturn weights) (transpose dailyReturns)
       expectedDailyReturn = mean portfolioReturns
-  in expectedDailyReturn * daysInYear
+   in expectedDailyReturn * daysInYear
   where
     weightedReturn :: [Weight] -> [DailyReturn] -> Float
     weightedReturn wList rs = sum (zipWith (*) wList rs)
@@ -103,15 +108,15 @@ computeAnnualizedReturn dailyReturns weights =
 computePortfolioStdDev :: [[DailyReturn]] -> [Weight] -> Float
 computePortfolioStdDev dailyReturns weights =
   let n = length dailyReturns
-      covMatrix = [[covariance (dailyReturns !! i) (dailyReturns !! j) | j <- [0..n-1]] | i <- [0..n-1]]
-      portfolioVariance = sum [ weights !! i * sum [ covMatrix !! i !! j * weights !! j | j <- [0..n-1]] | i <- [0..n-1]]
-  in if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysInYear
+      covMatrix = [[covariance (dailyReturns !! i) (dailyReturns !! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+      portfolioVariance = sum [weights !! i * sum [covMatrix !! i !! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+   in if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysInYear
 
 computeSharpe :: [[DailyReturn]] -> [Weight] -> SharpeRatio
 computeSharpe dailyReturns weights = do
   let annualizedReturn = computeAnnualizedReturn dailyReturns weights
       portfolioStdDev = computePortfolioStdDev dailyReturns weights
-      sharpe = if portfolioStdDev <= 0 then - (1 / 0) else (annualizedReturn - annualizedRiskFreeRate) / portfolioStdDev
+      sharpe = if portfolioStdDev <= 0 then -(1 / 0) else (annualizedReturn - annualizedRiskFreeRate) / portfolioStdDev
   sharpe
 
 generateWeights :: Int -> IO [Float]
