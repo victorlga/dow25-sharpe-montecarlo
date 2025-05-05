@@ -7,21 +7,32 @@ import Data.Csv (FromRecord(parseRecord), decode, HasHeader(NoHeader), parseFiel
 import Control.Monad (when)
 import System.IO (withFile, IOMode(ReadMode))
 
--- Define the record structure
 data StockData = StockData
-  { ticker :: !BS.ByteString
-  , prices :: !(V.Vector Float)
+  { ticker  :: !BS.ByteString
+  , prices  :: !(V.Vector Float)
+  , returns :: !(V.Vector Float)
   } deriving (Show)
 
--- Custom parser for the CSV
+subsets :: Int -> [a] -> [[a]]
+subsets k xs = go k xs []
+  where
+    go 0 _ acc = [acc]
+    go _ [] _ = []
+    go n (x:ys) acc = go (n-1) ys (x:acc) ++ go n ys acc
+
+computeReturns :: V.Vector Float -> V.Vector Float
+computeReturns vec =
+    V.zipWith (\p1 p0 -> (p1 - p0) / p0) (V.tail vec) (V.init vec)
+
 instance FromRecord StockData where
   parseRecord v = do
-    when (V.length v < 1) $ fail "CSV record must have at least one column"
+    when (null v) $ fail "CSV record must have at least one column"
     let tickerStr = v V.! 0
     priceList <- mapM (parseField . (v V.!)) [1..V.length v - 1]
-    pure $ StockData tickerStr (V.fromList priceList)
+    let priceVec = V.fromList priceList
+    let returnVec = computeReturns priceVec
+    pure $ StockData tickerStr priceVec returnVec
 
--- Function to read and parse CSV into a Vector of StockData
 readStockData :: FilePath -> IO (Either String (V.Vector StockData))
 readStockData filePath = do
   withFile filePath ReadMode $ \handle -> do
@@ -30,7 +41,15 @@ readStockData filePath = do
 
 main :: IO ()
 main = do
-  let filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
+  let totalAssets = 30 :: Int
+      selectedAssets = 25 :: Int
+      indices = [0 .. totalAssets - 1]
+      assetSubsets = subsets selectedAssets indices
+      total = length assetSubsets
+      filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
+
+  putStrLn $ "Total combinations of " ++ show selectedAssets ++ " assets from " ++ show totalAssets ++ " assets: " ++ show total
+
   result <- readStockData filePath
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
