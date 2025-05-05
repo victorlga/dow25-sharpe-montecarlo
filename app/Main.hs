@@ -2,6 +2,14 @@ module Main where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
+import Data.Csv
+  ( FromRecord (parseRecord),
+    HasHeader (NoHeader),
+    decode,
+    parseField,
+  )
+import Data.List (maximumBy)
+import Data.Ord (comparing)
 import qualified Data.Vector as V
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
@@ -26,22 +34,20 @@ computeCombinations k xs = go k xs []
   where
     go 0 _ acc = [acc]
     go _ [] _ = []
-    go n (x:ys) acc = go (n-1) ys (x:acc) ++ go n ys acc
+    go n (x : ys) acc = go (n - 1) ys (x : acc) ++ go n ys acc
 
-computeReturns :: V.Vector Float -> V.Vector Float
+computeReturns :: [Float] -> [Float]
 computeReturns vec =
-    V.zipWith (\p1 p0 -> (p1 - p0) / p0) (V.tail vec) (V.init vec)
+  zipWith (\p1 p0 -> (p1 - p0) / p0) (tail vec) (init vec)
 
-instance FromRecord StockData where
+instance FromRecord Stock where
   parseRecord v = do
-    when (null v) $ fail "CSV record must have at least one column"
-    let tickerStr = v V.! 0
-    priceList <- mapM (parseField . (v V.!)) [1..V.length v - 1]
-    let priceVec = V.fromList priceList
-    let returnVec = computeReturns priceVec
-    pure $ StockData tickerStr priceVec returnVec
+    prices <- mapM (parseField . (v V.!)) [1..V.length v - 1]
+    let t = v V.! 0
+        rs = computeReturns prices
+    pure $ Stock t rs
 
-readStockData :: FilePath -> IO (Either String (V.Vector StockData))
+readStockData :: FilePath -> IO (Either String (V.Vector Stock))
 readStockData filePath = do
   withFile filePath ReadMode $ \handle -> do
     csvData <- BS.hGetContents handle
