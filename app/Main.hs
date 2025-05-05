@@ -17,7 +17,7 @@ data StockData = StockData
 instance FromRecord StockData where
   parseRecord v = do
     when (V.length v < 1) $ fail "CSV record must have at least one column"
-    let tickerStr = v V.! 0 :: BS.ByteString
+    let tickerStr = v V.! 0
     priceList <- mapM (parseField . (v V.!)) [1..V.length v - 1]
     pure $ StockData tickerStr (V.fromList priceList)
 
