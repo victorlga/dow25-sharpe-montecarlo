@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad (replicateM)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
