@@ -34,4 +34,4 @@ main = do
   result <- readStockData filePath
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
-    Right _ -> putStrLn "\nDone"
+    Right records -> V.mapM_ print records
