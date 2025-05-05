@@ -87,24 +87,26 @@ findBestPortfolioForEachCombination stockVec indices = do
 
 main :: IO ()
 main = do
-  let totalAssets = 30 :: Int
-      selectedAssets = 25 :: Int
-      indices = [0 .. totalAssets - 1]
-      assetSubsets = subsets selectedAssets indices
-      total = length assetSubsets
-      filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
-
-  putStrLn $ "Total combinations of " ++ show selectedAssets ++ " assets from " ++ show totalAssets ++ " assets: " ++ show total
-
+  let filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
   result <- readStockData filePath
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
+    Right records -> do
+      let totalAssets = V.length records
+          numSelectedAssets = 25 :: Int
+          indices = [0 .. totalAssets - 1]
+          combinations = computeCombinations numSelectedAssets indices
+          total = length combinations
 
+      putStrLn $
+        "Total combinations of "
+          ++ show numSelectedAssets
+          ++ " assets from "
+          ++ show totalAssets
+          ++ " assets: "
+          ++ show total
 
       portfolios <- mapM (findBestPortfolioForEachCombination records) combinations
-
-      putStrLn "Point"
-
       let bestPortfolio = maximumBy (comparing sharpeRatio) portfolios
 
       putStrLn $ "Best portfolio: " ++ show bestPortfolio
