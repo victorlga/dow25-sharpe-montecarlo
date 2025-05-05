@@ -101,15 +101,7 @@ main = do
       let numSelectedAssets = 25 :: Int
           combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
 
-      portfolios <- mapM
-        (\(i, comb) -> do
-            putStrLn $ "Processing combination " ++ show (i + 1)
-            portfolio <- findBestPortfolioForEachCombination records comb
-            putStrLn $ "Finished combination " ++ show (i + 1) ++ ": Sharpe = " ++ show (sr portfolio)
-            pure portfolio
-        )
-        (zip [0..] combinations)
-
+      portfolios <- mapM (findBestPortfolioForEachCombination records) combinations
       let bestPortfolio = maximumBy (comparing sr) portfolios
 
       putStrLn $ "Best portfolio: " ++ show bestPortfolio
