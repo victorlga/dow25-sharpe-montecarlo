@@ -47,8 +47,8 @@ numTrials = 100
 numSelectedAssets :: Int
 numSelectedAssets = 25
 
-annualizedRiskFreeRate :: Float
-annualizedRiskFreeRate = 0.025
+riskFreeRate :: Float
+riskFreeRate = 0.025
 
 maxWeight :: Float
 maxWeight = 0.2
@@ -113,11 +113,13 @@ computePortfolioStdDev dailyReturns weights =
    in if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysInYear
 
 computeSharpe :: [[DailyReturn]] -> [Weight] -> SharpeRatio
-computeSharpe dailyReturns weights = do
+computeSharpe dailyReturns weights =
   let annualizedReturn = computeAnnualizedReturn dailyReturns weights
       portfolioStdDev = computePortfolioStdDev dailyReturns weights
-      sharpe = if portfolioStdDev <= 0 then -(1 / 0) else (annualizedReturn - annualizedRiskFreeRate) / portfolioStdDev
-  sharpe
+      sharpe = if portfolioStdDev <= 0
+               then 0
+               else (annualizedReturn - riskFreeRate) / portfolioStdDev
+  in sharpe
 
 generateWeights :: Int -> IO [Float]
 generateWeights n
