@@ -3,18 +3,26 @@ module Main where
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
-import Data.Csv (FromRecord(parseRecord), decode, HasHeader(NoHeader), parseField)
-import Control.Monad (when)
-import System.IO (withFile, IOMode(ReadMode))
+import System.IO (IOMode (ReadMode), withFile)
+import System.Random (randomRIO)
 
-data StockData = StockData
-  { ticker  :: !BS.ByteString
-  , prices  :: !(V.Vector Float)
-  , returns :: !(V.Vector Float)
-  } deriving (Show)
+type Ticker = BS.ByteString
 
-subsets :: Int -> [a] -> [[a]]
-subsets k xs = go k xs []
+data Stock = Stock
+  { ticker :: !Ticker,
+    dailyReturns :: ![Float]
+  }
+  deriving (Show)
+
+data Portfolio = Portfolio
+  { sharpeRatio :: Float,
+    weights :: [Float],
+    assets :: [Ticker]
+  }
+  deriving (Show)
+
+computeCombinations :: Int -> [a] -> [[a]]
+computeCombinations k xs = go k xs []
   where
     go 0 _ acc = [acc]
     go _ [] _ = []
