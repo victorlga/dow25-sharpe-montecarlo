@@ -27,3 +27,4 @@ executable dow25-sharpe-montecarlo
                     , bytestring
                     , vector
                     , cassava
+                    , random
