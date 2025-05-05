@@ -34,6 +34,24 @@ data Portfolio = Portfolio
   }
   deriving (Show)
 
+daysInYear :: Float
+daysInYear = 252
+
+numTrials :: Int
+numTrials = 100
+
+numSelectedAssets :: Int
+numSelectedAssets = 25
+
+annualizedRiskFreeRate :: Float
+annualizedRiskFreeRate = 0.025
+
+maxWeight :: Float
+maxWeight = 0.2
+
+filePath :: String
+filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
+
 computeCombinations :: Int -> [a] -> [[a]]
 computeCombinations k xs = go k xs []
   where
@@ -52,8 +70,8 @@ instance FromRecord Stock where
         dailyReturns = computeReturns prices
     pure $ Stock ticker dailyReturns
 
-readStockData :: FilePath -> IO (Either String (V.Vector Stock))
-readStockData filePath = do
+readStockData :: IO (Either String (V.Vector Stock))
+readStockData = do
   withFile filePath ReadMode $ \handle -> do
     csvData <- BS.hGetContents handle
     return $ decode NoHeader (BL.fromStrict csvData)
@@ -71,7 +89,7 @@ generateWeights n
       raw <- replicateM n (randomRIO (0, 1))
       let total = max (sum raw) 1e-10
           weights = map (/ total) raw
-      if any (> 0.2) weights
+      if any (> maxWeight) weights
         then tryWeights
         else pure weights
 
@@ -80,7 +98,6 @@ findBestPortfolioForEachCombination stockVec indices = do
   let selectedStocks = map (stockVec V.!) indices :: [Stock]
       tickers = map t selectedStocks :: [Ticker]
       dailyReturns = map drs selectedStocks :: [[DailyReturn]]
-      numTrials = 100 :: Int
   portfolios <-
     mapM
       ( \_ -> do
@@ -93,13 +110,11 @@ findBestPortfolioForEachCombination stockVec indices = do
 
 main :: IO ()
 main = do
-  let filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
-  result <- readStockData filePath
+  result <- readStockData
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right records -> do
-      let numSelectedAssets = 25 :: Int
-          combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
+      let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
 
       portfolios <- mapM (findBestPortfolioForEachCombination records) combinations
       let bestPortfolio = maximumBy (comparing sr) portfolios
