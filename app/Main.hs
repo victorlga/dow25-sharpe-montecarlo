@@ -43,7 +43,7 @@ computeReturns vec =
 
 instance FromRecord Stock where
   parseRecord v = do
-    prices <- mapM (parseField . (v V.!)) [1..V.length v - 1]
+    prices <- mapM (parseField . (v V.!)) [1 .. V.length v - 1]
     let t = v V.! 0
         rs = computeReturns prices
     pure $ Stock t rs
