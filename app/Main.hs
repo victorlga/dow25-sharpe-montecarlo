@@ -53,6 +53,24 @@ readStockData filePath = do
     csvData <- BS.hGetContents handle
     return $ decode NoHeader (BL.fromStrict csvData)
 
+computeSharpe :: [[Float]] -> [Float] -> Float
+computeSharpe stockReturns stockWeights = sum (zipWith (*) (map sum stockReturns) stockWeights)
+
+generateWeights :: Int -> IO [Float]
+generateWeights n
+  | n <= 0 = pure []
+  | otherwise = tryWeights
+  where
+    tryWeights = do
+      raw <- replicateM n (randomRIO (0, 1))
+      let total = max (sum raw) 1e-10
+          ws = map (/ total) raw
+      if any (> 0.2) ws
+        then tryWeights
+        else pure ws
+
+
+
 main :: IO ()
 main = do
   let totalAssets = 30 :: Int
