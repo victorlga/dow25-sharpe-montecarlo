@@ -16,16 +16,20 @@ import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
 
 type Ticker = BS.ByteString
+type DailyReturn = Float
+type SharpeRatio = Float
+type Weight = Float
+type Price = Float
 
 data Stock = Stock
-  { ticker :: !Ticker,
-    dailyReturns :: ![Float]
+  { t :: !Ticker,
+    drs :: ![DailyReturn]
   }
   deriving (Show)
 
 data Portfolio = Portfolio
-  { sharpeRatio :: Float,
-    weights :: [Float],
+  { sr :: SharpeRatio,
+    ws :: [Weight],
     assets :: [Ticker]
   }
   deriving (Show)
@@ -37,16 +41,16 @@ computeCombinations k xs = go k xs []
     go _ [] _ = []
     go n (x : ys) acc = go (n - 1) ys (x : acc) ++ go n ys acc
 
-computeReturns :: [Float] -> [Float]
+computeReturns :: [Price] -> [DailyReturn]
 computeReturns vec =
   zipWith (\p1 p0 -> (p1 - p0) / p0) (tail vec) (init vec)
 
 instance FromRecord Stock where
   parseRecord v = do
     prices <- mapM (parseField . (v V.!)) [1 .. V.length v - 1]
-    let t = v V.! 0
-        rs = computeReturns prices
-    pure $ Stock t rs
+    let ticker = v V.! 0
+        dailyReturns = computeReturns prices
+    pure $ Stock ticker dailyReturns
 
 readStockData :: FilePath -> IO (Either String (V.Vector Stock))
 readStockData filePath = do
@@ -54,8 +58,9 @@ readStockData filePath = do
     csvData <- BS.hGetContents handle
     return $ decode NoHeader (BL.fromStrict csvData)
 
-computeSharpe :: [[Float]] -> [Float] -> Float
-computeSharpe stockReturns stockWeights = sum (zipWith (*) (map sum stockReturns) stockWeights)
+-- WIP
+computeSharpe :: [[DailyReturn]] -> [Weight] -> SharpeRatio
+computeSharpe _ _ = 0
 
 generateWeights :: Int -> IO [Float]
 generateWeights n
@@ -65,26 +70,26 @@ generateWeights n
     tryWeights = do
       raw <- replicateM n (randomRIO (0, 1))
       let total = max (sum raw) 1e-10
-          ws = map (/ total) raw
-      if any (> 0.2) ws
+          weights = map (/ total) raw
+      if any (> 0.2) weights
         then tryWeights
-        else pure ws
+        else pure weights
 
 findBestPortfolioForEachCombination :: V.Vector Stock -> [Int] -> IO Portfolio
 findBestPortfolioForEachCombination stockVec indices = do
-  let stocks = map (stockVec V.!) indices :: [Stock]
-      ts = map ticker stocks :: [Ticker]
-      drs = map dailyReturns stocks :: [[Float]]
-      numTrials = 1000 :: Int
+  let selectedStocks = map (stockVec V.!) indices :: [Stock]
+      tickers = map t selectedStocks :: [Ticker]
+      dailyReturns = map drs selectedStocks :: [[DailyReturn]]
+      numTrials = 100 :: Int
   portfolios <-
     mapM
       ( \_ -> do
-          ws <- generateWeights (length indices)
-          let sr = computeSharpe drs ws
-          pure $ Portfolio sr ws ts
+          weights <- generateWeights (length indices)
+          let sharpeRatio = computeSharpe dailyReturns weights
+          pure $ Portfolio sharpeRatio weights tickers
       )
       [1 .. numTrials]
-  pure $ maximumBy (comparing sharpeRatio) portfolios
+  pure $ maximumBy (comparing sr) portfolios
 
 main :: IO ()
 main = do
@@ -93,21 +98,18 @@ main = do
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right records -> do
-      let totalAssets = V.length records
-          numSelectedAssets = 25 :: Int
-          indices = [0 .. totalAssets - 1]
-          combinations = computeCombinations numSelectedAssets indices
-          total = length combinations
+      let numSelectedAssets = 25 :: Int
+          combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
 
-      putStrLn $
-        "Total combinations of "
-          ++ show numSelectedAssets
-          ++ " assets from "
-          ++ show totalAssets
-          ++ " assets: "
-          ++ show total
+      portfolios <- mapM
+        (\(i, comb) -> do
+            putStrLn $ "Processing combination " ++ show (i + 1)
+            portfolio <- findBestPortfolioForEachCombination records comb
+            putStrLn $ "Finished combination " ++ show (i + 1) ++ ": Sharpe = " ++ show (sr portfolio)
+            pure portfolio
+        )
+        (zip [0..] combinations)
 
-      portfolios <- mapM (findBestPortfolioForEachCombination records) combinations
-      let bestPortfolio = maximumBy (comparing sharpeRatio) portfolios
+      let bestPortfolio = maximumBy (comparing sr) portfolios
 
       putStrLn $ "Best portfolio: " ++ show bestPortfolio
