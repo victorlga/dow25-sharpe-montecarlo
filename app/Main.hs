@@ -69,7 +69,21 @@ generateWeights n
         then tryWeights
         else pure ws
 
-
+findBestPortfolioForEachCombination :: V.Vector Stock -> [Int] -> IO Portfolio
+findBestPortfolioForEachCombination stockVec indices = do
+  let stocks = map (stockVec V.!) indices :: [Stock]
+      ts = map ticker stocks :: [Ticker]
+      drs = map dailyReturns stocks :: [[Float]]
+      numTrials = 1000 :: Int
+  portfolios <-
+    mapM
+      ( \_ -> do
+          ws <- generateWeights (length indices)
+          let sr = computeSharpe drs ws
+          pure $ Portfolio sr ws ts
+      )
+      [1 .. numTrials]
+  pure $ maximumBy (comparing sharpeRatio) portfolios
 
 main :: IO ()
 main = do
@@ -85,4 +99,12 @@ main = do
   result <- readStockData filePath
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
-    Right records -> V.mapM_ print records
+
+
+      portfolios <- mapM (findBestPortfolioForEachCombination records) combinations
+
+      putStrLn "Point"
+
+      let bestPortfolio = maximumBy (comparing sharpeRatio) portfolios
+
+      putStrLn $ "Best portfolio: " ++ show bestPortfolio
