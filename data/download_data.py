@@ -11,7 +11,7 @@ end_date = "2024-12-31"
 
 raw_data = yf.download(tickers, start=start_date, end=end_date)
 
-close_data = raw_data["Close"]
+close_data = raw_data["Close"].T
 
-close_data.to_csv("dow_jones_close_prices_aug_dec_2024.csv", index=False)
+close_data.to_csv("dow_jones_close_prices_aug_dec_2024.csv", index=True)
 
