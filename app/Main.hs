@@ -45,7 +45,7 @@ daysInYear :: Float
 daysInYear = 252
 
 numTrials :: Int
-numTrials = 100
+numTrials = 1000
 
 numSelectedAssets :: Int
 numSelectedAssets = 25
@@ -158,14 +158,12 @@ main = do
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right records -> do
       let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
-      putStrLn $ "Generating " ++ show (length combinations) ++ " combinations..."
       weightSetsList <- replicateM (length combinations) (generateAllWeightSets numTrials numSelectedAssets)
 
       let portfolios =
             withStrategy (parListChunk chunkSize rdeepseq) $
               zipWith (findBestPortfolio records) combinations weightSetsList
 
-      putStrLn $ "\nGenerated " ++ show (length portfolios) ++ " portfolios."
       let bestPortfolio = maximumBy (comparing sr) portfolios
 
       putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
