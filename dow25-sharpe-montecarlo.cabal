@@ -16,8 +16,11 @@ description:
     using Monte Carlo simulations and maximizing the Sharpe Ratio.
 
 common warnings
-    ghc-options:      -O2 -Wall -Wcompat -Wmissing-import-lists -Widentities -Wpartial-fields -Wredundant-constraints
+    ghc-options:      -O2 -Wall -Wcompat -Wmissing-import-lists -Widentities -Wpartial-fields -Wredundant-constraints -threaded
     default-language: Haskell2010
+    default-extensions:
+        DeriveGeneric
+        DeriveAnyClass
 
 executable dow25-sharpe-montecarlo
     import:           warnings
@@ -25,6 +28,9 @@ executable dow25-sharpe-montecarlo
     hs-source-dirs:   app
     build-depends:    base >= 4.7 && < 5
                     , bytestring
-                    , vector
                     , cassava
+                    , vector
                     , random
+                    , parallel
+                    , deepseq
+    ghc-options:      -O2 -threaded -rtsopts -with-rtsopts=-N
