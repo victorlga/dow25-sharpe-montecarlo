@@ -8,7 +8,7 @@ author:              Victor Assis
 maintainer:          victorluisgassis@gmail.com
 category:            Finance, Concurrency
 build-type:          Simple
-extra-doc-files:     README.md, CHANGELOG.md
+extra-doc-files:     README.md
 
 synopsis:            Monte Carlo portfolio optimization with Sharpe Ratio
 description:
