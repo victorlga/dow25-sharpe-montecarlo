@@ -1,6 +1,8 @@
 module Main where
 
+import Control.DeepSeq (NFData)
 import Control.Monad (replicateM)
+import Control.Parallel.Strategies (parListChunk, rdeepseq, withStrategy)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
@@ -12,6 +14,7 @@ import Data.Csv
 import Data.List (maximumBy)
 import Data.Ord (comparing)
 import qualified Data.Vector as V
+import GHC.Generics (Generic)
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
 
@@ -36,7 +39,7 @@ data Portfolio = Portfolio
     ws :: [Weight],
     assets :: [Ticker]
   }
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 daysInYear :: Float
 daysInYear = 252
@@ -55,6 +58,9 @@ maxWeight = 0.2
 
 filePath :: String
 filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
+
+chunkSize :: Int
+chunkSize = 1000
 
 computeCombinations :: Int -> [a] -> [[a]]
 computeCombinations k xs = go k xs []
@@ -116,15 +122,15 @@ computeSharpe :: [[DailyReturn]] -> [Weight] -> SharpeRatio
 computeSharpe dailyReturns weights =
   let annualizedReturn = computeAnnualizedReturn dailyReturns weights
       portfolioStdDev = computePortfolioStdDev dailyReturns weights
-      sharpe = if portfolioStdDev <= 0
-               then 0
-               else (annualizedReturn - riskFreeRate) / portfolioStdDev
-  in sharpe
+      sharpe =
+        if portfolioStdDev <= 0
+          then 0
+          else (annualizedReturn - riskFreeRate) / portfolioStdDev
+   in sharpe
 
-generateWeights :: Int -> IO [Float]
-generateWeights n
-  | n <= 0 = pure []
-  | otherwise = tryWeights
+generateWeights :: Int -> IO [Weight]
+generateWeights n = do
+  tryWeights
   where
     tryWeights = do
       raw <- replicateM n (randomRIO (0, 1))
@@ -134,20 +140,16 @@ generateWeights n
         then tryWeights
         else pure weights
 
-findBestPortfolioForEachCombination :: V.Vector Stock -> [Int] -> IO Portfolio
-findBestPortfolioForEachCombination stockVec indices = do
-  let selectedStocks = map (stockVec V.!) indices :: [Stock]
-      tickers = map t selectedStocks :: [Ticker]
-      dailyReturns = map drs selectedStocks :: [[DailyReturn]]
-  portfolios <-
-    mapM
-      ( \_ -> do
-          weights <- generateWeights (length indices)
-          let sharpeRatio = computeSharpe dailyReturns weights
-          pure $ Portfolio sharpeRatio weights tickers
-      )
-      [1 .. numTrials]
-  pure $ maximumBy (comparing sr) portfolios
+generateAllWeightSets :: Int -> Int -> IO [[Weight]]
+generateAllWeightSets trials n = replicateM trials (generateWeights n)
+
+findBestPortfolio :: V.Vector Stock -> [Int] -> [[Weight]] -> Portfolio
+findBestPortfolio stockVec indices weightSets =
+  let selectedStocks = map (stockVec V.!) indices
+      tickers = map t selectedStocks
+      dailyReturns = map drs selectedStocks
+      portfolios = [Portfolio (computeSharpe dailyReturns weights) weights tickers | weights <- weightSets]
+   in maximumBy (comparing sr) portfolios
 
 main :: IO ()
 main = do
@@ -156,8 +158,15 @@ main = do
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right records -> do
       let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
+      putStrLn $ "Generating " ++ show (length combinations) ++ " combinations..."
+      weightSetsList <- replicateM (length combinations) (generateAllWeightSets numTrials numSelectedAssets)
 
-      portfolios <- mapM (findBestPortfolioForEachCombination records) combinations
+      let portfolios =
+            withStrategy (parListChunk chunkSize rdeepseq) $
+              zipWith (findBestPortfolio records) combinations weightSetsList
+
+      putStrLn $ "\nGenerated " ++ show (length portfolios) ++ " portfolios."
       let bestPortfolio = maximumBy (comparing sr) portfolios
 
-      putStrLn $ "Best portfolio: " ++ show bestPortfolio
+      putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
+      putStrLn $ "Sum of weights: " ++ show (sum $ ws bestPortfolio)
