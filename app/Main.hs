@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad (replicateM)
+import Control.Monad (foldM, replicateM)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
@@ -9,12 +9,10 @@ import Data.Csv
     decode,
     parseField,
   )
-import Data.List (maximumBy)
-import Data.Ord (comparing)
+import Data.List (foldl', transpose)
 import qualified Data.Vector as V
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
-
 
 type Ticker = BS.ByteString
 
@@ -57,19 +55,16 @@ maxWeight = 0.2
 filePath :: String
 filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
 
-chunkSize :: Int
-chunkSize = 1000
-
 computeCombinations :: Int -> [a] -> [[a]]
 computeCombinations k xs = go k xs []
   where
     go 0 _ acc = [acc]
     go _ [] _ = []
-    go n (x : ys) acc = go (n - 1) ys (x : acc) ++ go n ys acc
+    go n (y : ys) acc = go (n - 1) ys (y : acc) ++ go n ys acc
 
 computeReturns :: [Price] -> [DailyReturn]
-computeReturns vec =
-  zipWith (\p1 p0 -> (p1 - p0) / p0) (tail vec) (init vec)
+computeReturns prices =
+  zipWith (\p1 p0 -> (p1 - p0) / p0) (tail prices) prices
 
 instance FromRecord Stock where
   parseRecord v = do
@@ -85,7 +80,7 @@ readStockData = do
     return $ decode NoHeader (BL.fromStrict csvData)
 
 mean :: [Float] -> Float
-mean xs = if null xs then 0 else sum xs / fromIntegral (length xs)
+mean xs = if null xs then 0 else foldl' (+) 0 xs / fromIntegral (length xs)
 
 covariance :: [Float] -> [Float] -> Float
 covariance xs ys
@@ -94,37 +89,34 @@ covariance xs ys
       let mx = mean xs
           my = mean ys
           n = fromIntegral (length xs)
-       in sum (zipWith (\x y -> (x - mx) * (y - my)) xs ys) / (n - 1)
+          products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
+       in foldl' (+) 0 products / (n - 1)
 
-computeAnnualizedReturn :: [[DailyReturn]] -> [Weight] -> Float
-computeAnnualizedReturn dailyReturns weights =
-  let portfolioReturns = map (weightedReturn weights) (transpose dailyReturns)
+computeCovarianceMatrix :: [[DailyReturn]] -> [[Float]]
+computeCovarianceMatrix dailyReturns =
+  [[covariance (dailyReturns !! i) (dailyReturns !! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+  where
+    n = length dailyReturns
+
+computePortfolioMetrics :: [[DailyReturn]] -> [[Float]] -> [Weight] -> (Float, Float)
+computePortfolioMetrics dailyReturns covMatrix weights =
+  let portfolioReturns = map (weightedReturn weights) dailyReturns
       expectedDailyReturn = mean portfolioReturns
-   in expectedDailyReturn * daysInYear
+      annualizedReturn = expectedDailyReturn * daysInYear
+
+      n = length weights
+      portfolioVariance = sum [weights !! i * sum [covMatrix !! i !! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+      portfolioStdDev = if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysInYear
+   in (annualizedReturn, portfolioStdDev)
   where
     weightedReturn :: [Weight] -> [DailyReturn] -> Float
     weightedReturn wList rs = sum (zipWith (*) wList rs)
 
-    transpose :: [[a]] -> [[a]]
-    transpose [] = []
-    transpose xs = if any null xs then [] else map head xs : transpose (map tail xs)
-
-computePortfolioStdDev :: [[DailyReturn]] -> [Weight] -> Float
-computePortfolioStdDev dailyReturns weights =
-  let n = length dailyReturns
-      covMatrix = [[covariance (dailyReturns !! i) (dailyReturns !! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
-      portfolioVariance = sum [weights !! i * sum [covMatrix !! i !! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
-   in if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysInYear
-
-computeSharpe :: [[DailyReturn]] -> [Weight] -> SharpeRatio
-computeSharpe dailyReturns weights =
-  let annualizedReturn = computeAnnualizedReturn dailyReturns weights
-      portfolioStdDev = computePortfolioStdDev dailyReturns weights
-      sharpe =
-        if portfolioStdDev <= 0
-          then 0
-          else (annualizedReturn - riskFreeRate) / portfolioStdDev
-   in sharpe
+computeSharpe :: Float -> Float -> SharpeRatio
+computeSharpe annualizedReturn portfolioStdDev =
+  if portfolioStdDev <= 0
+    then 0
+    else (annualizedReturn - riskFreeRate) / portfolioStdDev
 
 generateWeights :: Int -> IO [Weight]
 generateWeights n = do
@@ -141,26 +133,44 @@ generateWeights n = do
 generateAllWeightSets :: Int -> Int -> IO [[Weight]]
 generateAllWeightSets trials n = replicateM trials (generateWeights n)
 
-findBestPortfolio :: V.Vector Stock -> [Int] -> [[Weight]] -> Portfolio
-findBestPortfolio stockVec indices weightSets =
+findBestPortfolio :: V.Vector Stock -> [Int] -> [[Weight]] -> IO Portfolio
+findBestPortfolio stockVec indices weightSets = do
   let selectedStocks = map (stockVec V.!) indices
       tickers = map t selectedStocks
       dailyReturns = map drs selectedStocks
-      portfolios = [Portfolio (computeSharpe dailyReturns weights) weights tickers | weights <- weightSets]
-   in maximumBy (comparing sr) portfolios
+      transposedReturns = transpose dailyReturns
+      covMatrix = computeCovarianceMatrix dailyReturns
+
+  let initialBest = Portfolio (-1) [] tickers
+
+      processSingleWeightSet bestSoFar weights =
+        let (annRet, stdDev) = computePortfolioMetrics transposedReturns covMatrix weights
+            sharpe = computeSharpe annRet stdDev
+         in if sharpe > sr bestSoFar
+              then Portfolio sharpe weights tickers
+              else bestSoFar
+
+  return $ foldl' processSingleWeightSet initialBest weightSets
 
 main :: IO ()
 main = do
+  -- Pre-computar a variancia e a covariancia entre todos os ativos antes de entrar em loops
+  -- Trocar uso de listas por uso de vetores
   result <- readStockData
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right records -> do
       let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
-      weightSetsList <- replicateM (length combinations) (generateAllWeightSets numTrials numSelectedAssets)
 
-      let portfolios = zipWith (findBestPortfolio records) combinations weightSetsList
+      let initialBestPortfolio = Portfolio (-1) [] []
 
-      let bestPortfolio = maximumBy (comparing sr) portfolios
+      finalBestPortfolio <- foldM processOneCombination initialBestPortfolio combinations
 
-      putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
-      putStrLn $ "Sum of weights: " ++ show (sum $ ws bestPortfolio)
+      putStrLn $ "\nBest portfolio: " ++ show finalBestPortfolio
+      putStrLn $ "\nSum of weights: " ++ show (sum $ ws finalBestPortfolio)
+      where
+        processOneCombination :: Portfolio -> [Int] -> IO Portfolio
+        processOneCombination currentBest indices = do
+          weightSets <- generateAllWeightSets numTrials numSelectedAssets
+          newBest <- findBestPortfolio records indices weightSets
+          return $ if sr newBest > sr currentBest then newBest else currentBest
