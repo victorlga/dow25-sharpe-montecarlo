@@ -1,0 +1,21 @@
+{
+    "name": "Haskell Dev",
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+      "vscode": {
+        "settings": {
+          "terminal.integrated.defaultProfile.linux": "bash",
+          "files.autoSave": "afterDelay",
+          "files.autoSaveDelay": 1000
+        },
+        "extensions": [
+          "haskell.haskell"
+        ]
+      }
+    },
+    "postCreateCommand": "cabal update",
+    "remoteUser": "vscode"
+  }
+  
