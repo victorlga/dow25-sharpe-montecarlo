@@ -1,8 +1,6 @@
 module Main where
 
-import Control.DeepSeq (NFData)
 import Control.Monad (replicateM)
-import Control.Parallel.Strategies (parListChunk, rdeepseq, withStrategy)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
@@ -14,9 +12,9 @@ import Data.Csv
 import Data.List (maximumBy)
 import Data.Ord (comparing)
 import qualified Data.Vector as V
-import GHC.Generics (Generic)
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
+
 
 type Ticker = BS.ByteString
 
@@ -39,19 +37,19 @@ data Portfolio = Portfolio
     ws :: [Weight],
     assets :: [Ticker]
   }
-  deriving (Show, Generic, NFData)
+  deriving (Show)
 
 daysInYear :: Float
 daysInYear = 252
 
 numTrials :: Int
-numTrials = 1000
+numTrials = 100
 
 numSelectedAssets :: Int
 numSelectedAssets = 25
 
 riskFreeRate :: Float
-riskFreeRate = 0.025
+riskFreeRate = 0
 
 maxWeight :: Float
 maxWeight = 0.2
@@ -160,9 +158,7 @@ main = do
       let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
       weightSetsList <- replicateM (length combinations) (generateAllWeightSets numTrials numSelectedAssets)
 
-      let portfolios =
-            withStrategy (parListChunk chunkSize rdeepseq) $
-              zipWith (findBestPortfolio records) combinations weightSetsList
+      let portfolios = zipWith (findBestPortfolio records) combinations weightSetsList
 
       let bestPortfolio = maximumBy (comparing sr) portfolios
 
