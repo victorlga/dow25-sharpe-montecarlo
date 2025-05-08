@@ -37,20 +37,8 @@ data Portfolio = Portfolio
   }
   deriving (Show)
 
-daysInYear :: Float
-daysInYear = 252
-
 numTrials :: Int
 numTrials = 1000
-
-numSelectedAssets :: Int
-numSelectedAssets = 25
-
-riskFreeRate :: Float
-riskFreeRate = 0
-
-maxWeight :: Float
-maxWeight = 0.2
 
 filePath :: String
 filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
@@ -65,7 +53,7 @@ computeCombinations k xs = go k xs []
 computeReturns :: [Price] -> [DailyReturn]
 computeReturns [] = []
 computeReturns [_] = []
-computeReturns (p0:p1:ps) = (p1 - p0) / p0 : computeReturns (p1:ps)
+computeReturns (p0 : p1 : ps) = (p1 - p0) / p0 : computeReturns (p1 : ps)
 
 instance FromRecord Stock where
   parseRecord v = do
@@ -103,6 +91,7 @@ computePortfolioMetrics :: [[DailyReturn]] -> [[Float]] -> [Weight] -> (Float, F
 computePortfolioMetrics dailyReturns covMatrix weights =
   let portfolioReturns = map (weightedReturn weights) dailyReturns
       expectedDailyReturn = mean portfolioReturns
+      daysInYear = 252 :: Float
       annualizedReturn = expectedDailyReturn * daysInYear
 
       n = length weights
@@ -115,9 +104,10 @@ computePortfolioMetrics dailyReturns covMatrix weights =
 
 computeSharpe :: Float -> Float -> SharpeRatio
 computeSharpe annualizedReturn portfolioStdDev =
-  if portfolioStdDev <= 0
-    then 0
-    else (annualizedReturn - riskFreeRate) / portfolioStdDev
+  let riskFreeRate = 0
+   in if portfolioStdDev <= 0
+        then 0
+        else (annualizedReturn - riskFreeRate) / portfolioStdDev
 
 generateWeights :: Int -> IO [Weight]
 generateWeights n = do
@@ -127,6 +117,7 @@ generateWeights n = do
       raw <- replicateM n (randomRIO (0, 1))
       let total = max (sum raw) 1e-10
           weights = map (/ total) raw
+          maxWeight = 0.2
       if any (> maxWeight) weights
         then tryWeights
         else pure weights
@@ -161,12 +152,12 @@ main = do
   -- Pre-computar a variancia e a covariancia entre todos os ativos antes de entrar em loops
   --    Criar um Map em que a chave é uma tupla com os dois tickers e o valor é a covariancia.
   result <- readStockData
+  let numSelectedAssets = 25
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right records -> do
       let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
-
-      let initialBestPortfolio = Portfolio (-1) [] []
+          initialBestPortfolio = Portfolio (-1) [] []
 
       finalBestPortfolio <- foldM processOneCombination initialBestPortfolio combinations
 
