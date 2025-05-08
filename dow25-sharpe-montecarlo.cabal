@@ -1,30 +1,32 @@
-cabal-version:       3.0
-
-name:                dow25-sharpe-montecarlo
-version:             0.1.0.0
-license:             MIT
-license-file:        LICENSE
-author:              Victor Assis
-maintainer:          victorluisgassis@gmail.com
-category:            Finance, Concurrency
-build-type:          Simple
-extra-doc-files:     README.md
-
-synopsis:            Monte Carlo portfolio optimization with Sharpe Ratio
+cabal-version: 3.0
+name: dow25-sharpe-montecarlo
+version: 0.1.0.0
+license: MIT
+license-file: LICENSE
+author: Victor Assis
+maintainer: victorluisgassis@gmail.com
+category: Finance, Concurrency
+build-type: Simple
+extra-doc-files: README.md
+synopsis: Monte Carlo portfolio optimization with Sharpe Ratio
 description:
-    A Haskell program to select optimal portfolios of Dow Jones assets
-    using Monte Carlo simulations and maximizing the Sharpe Ratio.
+  A Haskell program to select optimal portfolios of Dow Jones assets
+  using Monte Carlo simulations and maximizing the Sharpe Ratio.
 
 common warnings
-    ghc-options:      -Wall -Wcompat -Wmissing-import-lists -Widentities -Wpartial-fields -Wredundant-constraints
-    default-language: Haskell2010
+  ghc-options: -Wall -Wcompat -Wmissing-import-lists -Widentities -Wpartial-fields -Wredundant-constraints
+  default-language: Haskell2010
 
 executable dow25-sharpe-montecarlo
-    import:           warnings
-    main-is:          Main.hs
-    hs-source-dirs:   app
-    build-depends:    base >= 4.7 && < 5
-                    , bytestring
-                    , cassava
-                    , vector
-                    , random
+  import: warnings
+  main-is: Main.hs
+  hs-source-dirs: app
+  build-depends:
+    , base >= 4.7 && < 5
+    , bytestring
+    , cassava
+    , vector
+    , random
+  default-extensions:
+    BangPatterns
+  ghc-options: -rtsopts -with-rtsopts=-s -O2

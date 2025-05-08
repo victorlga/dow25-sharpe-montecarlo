@@ -9,7 +9,7 @@ import Data.Csv
     decode,
     parseField,
   )
-import Data.List (foldl', transpose)
+import Data.List (transpose)
 import qualified Data.Vector as V
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
@@ -41,7 +41,7 @@ daysInYear :: Float
 daysInYear = 252
 
 numTrials :: Int
-numTrials = 100
+numTrials = 1000
 
 numSelectedAssets :: Int
 numSelectedAssets = 25
@@ -63,8 +63,9 @@ computeCombinations k xs = go k xs []
     go n (y : ys) acc = go (n - 1) ys (y : acc) ++ go n ys acc
 
 computeReturns :: [Price] -> [DailyReturn]
-computeReturns prices =
-  zipWith (\p1 p0 -> (p1 - p0) / p0) (tail prices) prices
+computeReturns [] = []
+computeReturns [_] = []
+computeReturns (p0:p1:ps) = (p1 - p0) / p0 : computeReturns (p1:ps)
 
 instance FromRecord Stock where
   parseRecord v = do
@@ -139,6 +140,7 @@ findBestPortfolio stockVec indices weightSets = do
       tickers = map t selectedStocks
       dailyReturns = map drs selectedStocks
       transposedReturns = transpose dailyReturns
+      -- Trocar para apenas montar a covMatrix a partir das covariacias gerais
       covMatrix = computeCovarianceMatrix dailyReturns
 
   let initialBest = Portfolio (-1) [] tickers
@@ -154,8 +156,10 @@ findBestPortfolio stockVec indices weightSets = do
 
 main :: IO ()
 main = do
-  -- Pre-computar a variancia e a covariancia entre todos os ativos antes de entrar em loops
   -- Trocar uso de listas por uso de vetores
+  --    Usar "import qualified Data.Vector.Unboxed as U" quando for vetor de tipo primitivo
+  -- Pre-computar a variancia e a covariancia entre todos os ativos antes de entrar em loops
+  --    Criar um Map em que a chave é uma tupla com os dois tickers e o valor é a covariancia.
   result <- readStockData
   case result of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
@@ -173,4 +177,6 @@ main = do
         processOneCombination currentBest indices = do
           weightSets <- generateAllWeightSets numTrials numSelectedAssets
           newBest <- findBestPortfolio records indices weightSets
-          return $ if sr newBest > sr currentBest then newBest else currentBest
+          let !srNew = sr newBest
+          let !srCurrent = sr currentBest
+          return $ if srNew > srCurrent then newBest else currentBest
