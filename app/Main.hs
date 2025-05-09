@@ -67,7 +67,7 @@ loadStockCsvData = do
     return $ decode NoHeader (BL.fromStrict csvData)
 
 average :: [Float] -> Float
-average xs = if null xs then 0 else foldl' (+) 0 xs / fromIntegral (length xs)
+average xs = if null xs then 0 else foldl (+) 0 xs / fromIntegral (length xs)
 
 calculateCovariance :: [Float] -> [Float] -> Float
 calculateCovariance xs ys
@@ -77,7 +77,7 @@ calculateCovariance xs ys
           my = average ys
           n = fromIntegral (length xs)
           products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
-       in foldl' (+) 0 products / (n - 1)
+       in foldl (+) 0 products / (n - 1)
 
 computeCovarianceMatrix :: V.Vector [DailyReturn] -> V.Vector (U.Vector Float)
 computeCovarianceMatrix returnsVec =
@@ -142,7 +142,7 @@ evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
               then Portfolio sharpe weights tickers
               else bestSoFar
 
-  return $ foldl' testWeightSet initialPortfolio weightSets
+  return $ foldl testWeightSet initialPortfolio weightSets
 
 main :: IO ()
 main = do
