@@ -25,121 +25,120 @@ type Weight = Float
 type Price = Float
 
 data Stock = Stock
-  { t :: !Ticker,
-    drs :: ![DailyReturn]
+  { stockTicker :: !Ticker,
+    stockReturns :: ![DailyReturn]
   }
   deriving (Show)
 
 data Portfolio = Portfolio
-  { sr :: SharpeRatio,
-    ws :: [Weight],
-    assets :: [Ticker]
+  { portfolioSharpe :: SharpeRatio,
+    portfolioWeights :: [Weight],
+    portfolioTickers :: [Ticker]
   }
   deriving (Show)
 
-filePath :: String
-filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
+csvFilePath :: String
+csvFilePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
 
-computeCombinations :: Int -> [a] -> [[a]]
-computeCombinations k xs = go k xs []
+selectIndexCombinations :: Int -> [a] -> [[a]]
+selectIndexCombinations k xs = go k xs []
   where
     go 0 _ acc = [acc]
     go _ [] _ = []
     go n (y : ys) acc = go (n - 1) ys (y : acc) ++ go n ys acc
 
-computeReturns :: [Price] -> [DailyReturn]
-computeReturns [] = []
-computeReturns [_] = []
-computeReturns (p0:p1:ps) = (p1 - p0) / p0 : computeReturns (p1:ps)
+calculateDailyReturns :: [Price] -> [DailyReturn]
+calculateDailyReturns [] = []
+calculateDailyReturns [_] = []
+calculateDailyReturns (p0:p1:ps) = (p1 - p0) / p0 : calculateDailyReturns (p1:ps)
 
 instance FromRecord Stock where
   parseRecord v = do
     prices <- mapM (parseField . (v V.!)) [1 .. V.length v - 1]
     let ticker = v V.! 0
-        dailyReturns = computeReturns prices
-    pure $ Stock ticker dailyReturns
+        returns = calculateDailyReturns prices
+    pure $ Stock ticker returns
 
-readStockData :: IO (Either String (V.Vector Stock))
-readStockData = do
-  withFile filePath ReadMode $ \handle -> do
+loadStockCsvData :: IO (Either String (V.Vector Stock))
+loadStockCsvData = do
+  withFile csvFilePath ReadMode $ \handle -> do
     csvData <- BS.hGetContents handle
     return $ decode NoHeader (BL.fromStrict csvData)
 
-mean :: [Float] -> Float
-mean xs = if null xs then 0 else foldl' (+) 0 xs / fromIntegral (length xs)
+average :: [Float] -> Float
+average xs = if null xs then 0 else foldl' (+) 0 xs / fromIntegral (length xs)
 
-covariance :: [Float] -> [Float] -> Float
-covariance xs ys
+calculateCovariance :: [Float] -> [Float] -> Float
+calculateCovariance xs ys
   | null xs || null ys || length xs == 1 = 0
   | otherwise =
-      let mx = mean xs
-          my = mean ys
+      let mx = average xs
+          my = average ys
           n = fromIntegral (length xs)
           products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
        in foldl' (+) 0 products / (n - 1)
 
 computeCovarianceMatrix :: V.Vector [DailyReturn] -> [[Float]]
-computeCovarianceMatrix dailyReturns =
-  [[covariance (dailyReturns V.! i) (dailyReturns V.! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+computeCovarianceMatrix returnsVec =
+  [[calculateCovariance (returnsVec V.! i) (returnsVec V.! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
   where
-    n = V.length dailyReturns
+    n = V.length returnsVec
 
-computePortfolioMetrics :: [[DailyReturn]] -> [[Float]] -> [Weight] -> (Float, Float)
-computePortfolioMetrics dailyReturns covMatrix weights =
-  let portfolioReturns = map (weightedReturn weights) dailyReturns
-      expectedDailyReturn = mean portfolioReturns
-      daysInYear = 252 :: Float
-      annualizedReturn = expectedDailyReturn * daysInYear
+evaluatePortfolio :: [[DailyReturn]] -> [[Float]] -> [Weight] -> (Float, Float)
+evaluatePortfolio returnMatrix covarianceMatrix weights =
+  let weightedReturnsOverTime = map (applyWeights weights) returnMatrix
+      avgDailyReturn = average weightedReturnsOverTime
+      daysPerYear = 252 :: Float
+      annualizedReturn = avgDailyReturn * daysPerYear
 
       n = length weights
-      portfolioVariance = sum [weights !! i * sum [covMatrix !! i !! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
-      portfolioStdDev = if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysInYear
+      portfolioVariance = sum [weights !! i * sum [covarianceMatrix !! i !! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+      portfolioStdDev = if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysPerYear
    in (annualizedReturn, portfolioStdDev)
   where
-    weightedReturn :: [Weight] -> [DailyReturn] -> Float
-    weightedReturn wList rs = sum (zipWith (*) wList rs)
+    applyWeights :: [Weight] -> [DailyReturn] -> Float
+    applyWeights ws rs = sum (zipWith (*) ws rs)
 
-computeSharpe :: Float -> Float -> SharpeRatio
-computeSharpe annualizedReturn portfolioStdDev =
-  if portfolioStdDev <= 0
+calculateSharpeRatio :: Float -> Float -> SharpeRatio
+calculateSharpeRatio annualReturn stdDev =
+  if stdDev <= 0
     then 0
-    else annualizedReturn / portfolioStdDev
+    else annualReturn / stdDev
 
-generateWeights :: Int -> IO [Weight]
-generateWeights n = do
-  tryWeights
+generateNormalizedWeights :: Int -> IO [Weight]
+generateNormalizedWeights n = do
+  trySample
   where
-    tryWeights = do
-      raw <- replicateM n (randomRIO (0, 1))
-      let total = max (sum raw) 1e-10
-          weights = map (/ total) raw
-          maxWeight = 0.2
-      if any (> maxWeight) weights
-        then tryWeights
-        else pure weights
+    trySample = do
+      rawWeights <- replicateM n (randomRIO (0, 1))
+      let total = max (sum rawWeights) 1e-10
+          normalized = map (/ total) rawWeights
+          maxAllowedWeight = 0.2
+      if any (> maxAllowedWeight) normalized
+        then trySample
+        else pure normalized
 
-generateAllWeightSets :: Int -> Int -> IO [[Weight]]
-generateAllWeightSets trials n = replicateM trials (generateWeights n)
+generateMultipleWeightSets :: Int -> Int -> IO [[Weight]]
+generateMultipleWeightSets trials n = replicateM trials (generateNormalizedWeights n)
 
-findBestPortfolio :: V.Vector Stock -> [[Float]] -> [Int] -> [[Weight]] -> IO Portfolio
-findBestPortfolio stockVec covMatrix indices weightSets = do
-  let selectedStocks = map (stockVec V.!) indices
-      tickers = map t selectedStocks
-      dailyReturns = map drs selectedStocks
-      transposedReturns = transpose dailyReturns
-      covariances = [ [ covMatrix !! i !! j | j <- indices ] | i <- indices ]
+evaluateWeightSets :: V.Vector Stock -> [[Float]] -> [Int] -> [[Weight]] -> IO Portfolio
+evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
+  let selectedStocks = map (stockVec V.!) selectedIdx
+      tickers = map stockTicker selectedStocks
+      returns = map stockReturns selectedStocks
+      timeSeries = transpose returns
+      selectedCovMatrix = [ [ covMatrix !! i !! j | j <- selectedIdx ] | i <- selectedIdx ]
 
+  let initialPortfolio = Portfolio (-1) [] tickers
 
-  let initialBest = Portfolio (-1) [] tickers
-
-      processSingleWeightSet bestSoFar weights =
-        let (annRet, stdDev) = computePortfolioMetrics transposedReturns covariances weights
-            sharpe = computeSharpe annRet stdDev
-         in if sharpe > sr bestSoFar
+      testWeightSet bestSoFar weights =
+        let (annReturn, stdDev) = evaluatePortfolio timeSeries selectedCovMatrix weights
+            sharpe = calculateSharpeRatio annReturn stdDev
+         in if sharpe > portfolioSharpe bestSoFar
               then Portfolio sharpe weights tickers
               else bestSoFar
 
-  return $ foldl' processSingleWeightSet initialBest weightSets
+  return $ foldl' testWeightSet initialPortfolio weightSets
 
 main :: IO ()
 main = do
@@ -147,23 +146,23 @@ main = do
   --    Usar "import qualified Data.Vector.Unboxed as U" quando for vetor de tipo primitivo
   -- Pre-computar a variancia e a covariancia entre todos os ativos antes de entrar em loops
   --    Criar um Map em que a chave é uma tupla com os dois tickers e o valor é a covariancia.
-  result <- readStockData
-  let numSelectedAssets = 25
-  case result of
+  stockData <- loadStockCsvData
+  let portfolioSize = 25
+  case stockData of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
-    Right records -> do
-      let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
-          initialBestPortfolio = Portfolio (-1) [] []
-          covMatrix = computeCovarianceMatrix (V.map drs records)
+    Right stockVec -> do
+      let allCombinations = selectIndexCombinations portfolioSize [0 .. V.length stockVec - 1]
+          covMatrix = computeCovarianceMatrix (V.map stockReturns stockVec)
+          initialBest = Portfolio (-1) [] []
 
-      finalBestPortfolio <- foldM processOneCombination initialBestPortfolio combinations
+      bestPortfolio <- foldM (\best idxs -> tryPortfolio covMatrix best idxs) initialBest allCombinations
 
-      putStrLn $ "\nBest portfolio: " ++ show finalBestPortfolio
-      putStrLn $ "\nSum of weights: " ++ show (sum $ ws finalBestPortfolio)
+      putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
+      putStrLn $ "\nSum of weights: " ++ show (sum $ portfolioWeights bestPortfolio)
       where
-        processOneCombination :: Portfolio -> [Int] -> IO Portfolio
-        processOneCombination currentBest indices = do
+        tryPortfolio :: [[Float]] -> Portfolio -> [Int] -> IO Portfolio
+        tryPortfolio covMatrix currentBest selectedIdx = do
           let numTrials = 1000
-          weightSets <- generateAllWeightSets numTrials numSelectedAssets
-          !newBest <- findBestPortfolio records covMatrix indices weightSets
-          return $ if sr newBest > sr currentBest then newBest else currentBest
+          weightOptions <- generateMultipleWeightSets numTrials portfolioSize
+          !candidate <- evaluateWeightSets stockVec covMatrix selectedIdx weightOptions
+          return $ if portfolioSharpe candidate > portfolioSharpe currentBest then candidate else currentBest
