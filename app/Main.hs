@@ -37,9 +37,6 @@ data Portfolio = Portfolio
   }
   deriving (Show)
 
-numTrials :: Int
-numTrials = 1000
-
 filePath :: String
 filePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
 
@@ -53,7 +50,7 @@ computeCombinations k xs = go k xs []
 computeReturns :: [Price] -> [DailyReturn]
 computeReturns [] = []
 computeReturns [_] = []
-computeReturns (p0 : p1 : ps) = (p1 - p0) / p0 : computeReturns (p1 : ps)
+computeReturns (p0:p1:ps) = (p1 - p0) / p0 : computeReturns (p1:ps)
 
 instance FromRecord Stock where
   parseRecord v = do
@@ -81,11 +78,11 @@ covariance xs ys
           products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
        in foldl' (+) 0 products / (n - 1)
 
-computeCovarianceMatrix :: [[DailyReturn]] -> [[Float]]
+computeCovarianceMatrix :: V.Vector [DailyReturn] -> [[Float]]
 computeCovarianceMatrix dailyReturns =
-  [[covariance (dailyReturns !! i) (dailyReturns !! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+  [[covariance (dailyReturns V.! i) (dailyReturns V.! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
   where
-    n = length dailyReturns
+    n = V.length dailyReturns
 
 computePortfolioMetrics :: [[DailyReturn]] -> [[Float]] -> [Weight] -> (Float, Float)
 computePortfolioMetrics dailyReturns covMatrix weights =
@@ -104,10 +101,9 @@ computePortfolioMetrics dailyReturns covMatrix weights =
 
 computeSharpe :: Float -> Float -> SharpeRatio
 computeSharpe annualizedReturn portfolioStdDev =
-  let riskFreeRate = 0
-   in if portfolioStdDev <= 0
-        then 0
-        else (annualizedReturn - riskFreeRate) / portfolioStdDev
+  if portfolioStdDev <= 0
+    then 0
+    else annualizedReturn / portfolioStdDev
 
 generateWeights :: Int -> IO [Weight]
 generateWeights n = do
@@ -125,19 +121,19 @@ generateWeights n = do
 generateAllWeightSets :: Int -> Int -> IO [[Weight]]
 generateAllWeightSets trials n = replicateM trials (generateWeights n)
 
-findBestPortfolio :: V.Vector Stock -> [Int] -> [[Weight]] -> IO Portfolio
-findBestPortfolio stockVec indices weightSets = do
+findBestPortfolio :: V.Vector Stock -> [[Float]] -> [Int] -> [[Weight]] -> IO Portfolio
+findBestPortfolio stockVec covMatrix indices weightSets = do
   let selectedStocks = map (stockVec V.!) indices
       tickers = map t selectedStocks
       dailyReturns = map drs selectedStocks
       transposedReturns = transpose dailyReturns
-      -- Trocar para apenas montar a covMatrix a partir das covariacias gerais
-      covMatrix = computeCovarianceMatrix dailyReturns
+      covariances = [ [ covMatrix !! i !! j | j <- indices ] | i <- indices ]
+
 
   let initialBest = Portfolio (-1) [] tickers
 
       processSingleWeightSet bestSoFar weights =
-        let (annRet, stdDev) = computePortfolioMetrics transposedReturns covMatrix weights
+        let (annRet, stdDev) = computePortfolioMetrics transposedReturns covariances weights
             sharpe = computeSharpe annRet stdDev
          in if sharpe > sr bestSoFar
               then Portfolio sharpe weights tickers
@@ -158,6 +154,7 @@ main = do
     Right records -> do
       let combinations = computeCombinations numSelectedAssets [0 .. V.length records - 1]
           initialBestPortfolio = Portfolio (-1) [] []
+          covMatrix = computeCovarianceMatrix (V.map drs records)
 
       finalBestPortfolio <- foldM processOneCombination initialBestPortfolio combinations
 
@@ -166,8 +163,7 @@ main = do
       where
         processOneCombination :: Portfolio -> [Int] -> IO Portfolio
         processOneCombination currentBest indices = do
+          let numTrials = 1000
           weightSets <- generateAllWeightSets numTrials numSelectedAssets
-          newBest <- findBestPortfolio records indices weightSets
-          let !srNew = sr newBest
-          let !srCurrent = sr currentBest
-          return $ if srNew > srCurrent then newBest else currentBest
+          !newBest <- findBestPortfolio records covMatrix indices weightSets
+          return $ if sr newBest > sr currentBest then newBest else currentBest
