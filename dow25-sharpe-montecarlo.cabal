@@ -29,4 +29,4 @@ executable dow25-sharpe-montecarlo
     , random
   default-extensions:
     BangPatterns
-  ghc-options: -rtsopts -with-rtsopts=-s -O2
+  ghc-options: -O3
