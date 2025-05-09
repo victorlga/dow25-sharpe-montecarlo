@@ -10,6 +10,3 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -ms /bin/bash vscode
 USER vscode
 WORKDIR /home/vscode
-
-# Ensure cabal directory is initialized
-RUN cabal update
