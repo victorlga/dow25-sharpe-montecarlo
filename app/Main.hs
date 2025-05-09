@@ -11,6 +11,7 @@ import Data.Csv
   )
 import Data.List (transpose)
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as U
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
 
@@ -78,13 +79,13 @@ calculateCovariance xs ys
           products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
        in foldl' (+) 0 products / (n - 1)
 
-computeCovarianceMatrix :: V.Vector [DailyReturn] -> V.Vector (V.Vector Float)
+computeCovarianceMatrix :: V.Vector [DailyReturn] -> V.Vector (U.Vector Float)
 computeCovarianceMatrix returnsVec =
-  V.generate n (\i -> V.generate n (\j -> calculateCovariance (returnsVec V.! i) (returnsVec V.! j)))
+  V.generate n (\i -> U.generate n (\j -> calculateCovariance (returnsVec V.! i) (returnsVec V.! j)))
   where
     n = V.length returnsVec
 
-evaluatePortfolio :: [[DailyReturn]] -> V.Vector (V.Vector Float) -> [Weight] -> (Float, Float)
+evaluatePortfolio :: [[DailyReturn]] -> V.Vector (U.Vector Float) -> [Weight] -> (Float, Float)
 evaluatePortfolio timeSeries covarianceMatrix weights =
   let weightedReturnsOverTime = map (applyWeights weights) timeSeries
       avgDailyReturn = average weightedReturnsOverTime
@@ -92,7 +93,7 @@ evaluatePortfolio timeSeries covarianceMatrix weights =
       annualizedReturn = avgDailyReturn * daysPerYear
 
       n = length weights
-      portfolioVariance = sum [weights !! i * sum [covarianceMatrix V.! i V.! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+      portfolioVariance = sum [weights !! i * sum [covarianceMatrix V.! i U.! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
       portfolioStdDev = if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysPerYear
    in (annualizedReturn, portfolioStdDev)
   where
@@ -121,17 +122,16 @@ generateNormalizedWeights n = do
 generateMultipleWeightSets :: Int -> Int -> IO [[Weight]]
 generateMultipleWeightSets trials n = replicateM trials (generateNormalizedWeights n)
 
-evaluateWeightSets :: V.Vector Stock -> V.Vector (V.Vector Float) -> [Int] -> [[Weight]] -> IO Portfolio
+evaluateWeightSets :: V.Vector Stock -> V.Vector (U.Vector Float) -> [Int] -> [[Weight]] -> IO Portfolio
 evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
-
   let selectedStocks = map (stockVec V.!) selectedIdx
       tickers = map stockTicker selectedStocks
       returns = map stockReturns selectedStocks
       timeSeries = transpose returns
-      selectedIdxVec = V.fromList selectedIdx
-      selectedCovMatrix = V.generate (length selectedIdxVec) $ \i ->
-                          V.generate (length selectedIdxVec) $ \j ->
-                            covMatrix V.! (selectedIdxVec V.! i) V.! (selectedIdxVec V.! j)
+      selectedIdxVec = U.fromList selectedIdx
+      selectedCovMatrix = V.generate (length selectedIdx) $ \i ->
+                          U.generate (length selectedIdx) $ \j ->
+                            covMatrix V.! (selectedIdxVec U.! i) U.! (selectedIdxVec U.! j)
 
   let initialPortfolio = Portfolio (-1) [] tickers
 
@@ -146,8 +146,6 @@ evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
 
 main :: IO ()
 main = do
-  -- Trocar uso de listas por uso de vetores
-  --    Usar "import qualified Data.Vector.Unboxed as U" quando for vetor de tipo primitivo
   stockData <- loadStockCsvData
   let portfolioSize = 25
   case stockData of
@@ -162,7 +160,7 @@ main = do
       putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
       putStrLn $ "\nSum of weights: " ++ show (sum $ portfolioWeights bestPortfolio)
       where
-        tryPortfolio :: V.Vector (V.Vector Float) -> Portfolio -> [Int] -> IO Portfolio
+        tryPortfolio :: V.Vector (U.Vector Float) -> Portfolio -> [Int] -> IO Portfolio
         tryPortfolio covMatrix currentBest selectedIdx = do
           let numTrials = 1000
           weightSets <- generateMultipleWeightSets numTrials portfolioSize
