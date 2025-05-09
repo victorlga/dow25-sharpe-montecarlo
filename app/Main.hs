@@ -40,8 +40,8 @@ data Portfolio = Portfolio
 csvFilePath :: String
 csvFilePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
 
-selectIndexCombinations :: Int -> [a] -> [[a]]
-selectIndexCombinations k xs = go k xs []
+generateIndexCombinations :: Int -> [a] -> [[a]]
+generateIndexCombinations k xs = go k xs []
   where
     go 0 _ acc = [acc]
     go _ [] _ = []
@@ -78,21 +78,21 @@ calculateCovariance xs ys
           products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
        in foldl' (+) 0 products / (n - 1)
 
-computeCovarianceMatrix :: V.Vector [DailyReturn] -> [[Float]]
+computeCovarianceMatrix :: V.Vector [DailyReturn] -> V.Vector (V.Vector Float)
 computeCovarianceMatrix returnsVec =
-  [[calculateCovariance (returnsVec V.! i) (returnsVec V.! j) | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+  V.generate n (\i -> V.generate n (\j -> calculateCovariance (returnsVec V.! i) (returnsVec V.! j)))
   where
     n = V.length returnsVec
 
-evaluatePortfolio :: [[DailyReturn]] -> [[Float]] -> [Weight] -> (Float, Float)
-evaluatePortfolio returnMatrix covarianceMatrix weights =
-  let weightedReturnsOverTime = map (applyWeights weights) returnMatrix
+evaluatePortfolio :: [[DailyReturn]] -> V.Vector (V.Vector Float) -> [Weight] -> (Float, Float)
+evaluatePortfolio timeSeries covarianceMatrix weights =
+  let weightedReturnsOverTime = map (applyWeights weights) timeSeries
       avgDailyReturn = average weightedReturnsOverTime
       daysPerYear = 252 :: Float
       annualizedReturn = avgDailyReturn * daysPerYear
 
       n = length weights
-      portfolioVariance = sum [weights !! i * sum [covarianceMatrix !! i !! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+      portfolioVariance = sum [weights !! i * sum [covarianceMatrix V.! i V.! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
       portfolioStdDev = if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysPerYear
    in (annualizedReturn, portfolioStdDev)
   where
@@ -121,13 +121,17 @@ generateNormalizedWeights n = do
 generateMultipleWeightSets :: Int -> Int -> IO [[Weight]]
 generateMultipleWeightSets trials n = replicateM trials (generateNormalizedWeights n)
 
-evaluateWeightSets :: V.Vector Stock -> [[Float]] -> [Int] -> [[Weight]] -> IO Portfolio
+evaluateWeightSets :: V.Vector Stock -> V.Vector (V.Vector Float) -> [Int] -> [[Weight]] -> IO Portfolio
 evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
+
   let selectedStocks = map (stockVec V.!) selectedIdx
       tickers = map stockTicker selectedStocks
       returns = map stockReturns selectedStocks
       timeSeries = transpose returns
-      selectedCovMatrix = [ [ covMatrix !! i !! j | j <- selectedIdx ] | i <- selectedIdx ]
+      selectedIdxVec = V.fromList selectedIdx
+      selectedCovMatrix = V.generate (length selectedIdxVec) $ \i ->
+                          V.generate (length selectedIdxVec) $ \j ->
+                            covMatrix V.! (selectedIdxVec V.! i) V.! (selectedIdxVec V.! j)
 
   let initialPortfolio = Portfolio (-1) [] tickers
 
@@ -144,14 +148,12 @@ main :: IO ()
 main = do
   -- Trocar uso de listas por uso de vetores
   --    Usar "import qualified Data.Vector.Unboxed as U" quando for vetor de tipo primitivo
-  -- Pre-computar a variancia e a covariancia entre todos os ativos antes de entrar em loops
-  --    Criar um Map em que a chave é uma tupla com os dois tickers e o valor é a covariancia.
   stockData <- loadStockCsvData
   let portfolioSize = 25
   case stockData of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right stockVec -> do
-      let allCombinations = selectIndexCombinations portfolioSize [0 .. V.length stockVec - 1]
+      let allCombinations = generateIndexCombinations portfolioSize [0 .. V.length stockVec - 1]
           covMatrix = computeCovarianceMatrix (V.map stockReturns stockVec)
           initialBest = Portfolio (-1) [] []
 
@@ -160,9 +162,9 @@ main = do
       putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
       putStrLn $ "\nSum of weights: " ++ show (sum $ portfolioWeights bestPortfolio)
       where
-        tryPortfolio :: [[Float]] -> Portfolio -> [Int] -> IO Portfolio
+        tryPortfolio :: V.Vector (V.Vector Float) -> Portfolio -> [Int] -> IO Portfolio
         tryPortfolio covMatrix currentBest selectedIdx = do
           let numTrials = 1000
-          weightOptions <- generateMultipleWeightSets numTrials portfolioSize
-          !candidate <- evaluateWeightSets stockVec covMatrix selectedIdx weightOptions
+          weightSets <- generateMultipleWeightSets numTrials portfolioSize
+          !candidate <- evaluateWeightSets stockVec covMatrix selectedIdx weightSets
           return $ if portfolioSharpe candidate > portfolioSharpe currentBest then candidate else currentBest
