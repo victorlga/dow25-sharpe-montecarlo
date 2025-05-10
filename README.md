@@ -4,6 +4,5 @@
 
 ```bash
 cabal clean
-cabal build
-cabal run dow25-sharpe-montecarlo
+cabal run dow25-sharpe-montecarlo -- +RTS -N4 -RTS
 ```

@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Monad (foldM, replicateM)
+import Control.DeepSeq (NFData)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
@@ -10,10 +11,14 @@ import Data.Csv
     parseField,
   )
 import Data.List (transpose)
+import Data.List.Split (chunksOf)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U
 import System.IO (IOMode (ReadMode), withFile)
 import System.Random (randomRIO)
+import Control.Parallel.Strategies (withStrategy, parList, rdeepseq)
+import GHC.Conc (getNumCapabilities)
+import GHC.Generics (Generic)
 
 type Ticker = BS.ByteString
 
@@ -36,7 +41,9 @@ data Portfolio = Portfolio
     portfolioWeights :: [Weight],
     portfolioTickers :: [Ticker]
   }
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance NFData Portfolio
 
 csvFilePath :: String
 csvFilePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
@@ -133,8 +140,6 @@ evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
                           U.generate (length selectedIdx) $ \j ->
                             covMatrix V.! (selectedIdxVec U.! i) U.! (selectedIdxVec U.! j)
 
-  let initialPortfolio = Portfolio (-1) [] tickers
-
       testWeightSet bestSoFar weights =
         let (annReturn, stdDev) = evaluatePortfolio timeSeries selectedCovMatrix weights
             sharpe = calculateSharpeRatio annReturn stdDev
@@ -142,7 +147,19 @@ evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
               then Portfolio sharpe weights tickers
               else bestSoFar
 
-  return $ foldl testWeightSet initialPortfolio weightSets
+  numCaps <- getNumCapabilities
+  let numWeightSets = length weightSets
+      chunkSize = max 1 (numWeightSets `div` numCaps)  -- Ensure chunkSize is at least 1
+      wsChunks = chunksOf chunkSize weightSets
+  
+  let initialPortfolio = Portfolio (-1.0/0.0) [] tickers
+  let processChunk :: [[Weight]] -> Portfolio
+      processChunk chunk = foldl' testWeightSet initialPortfolio chunk
+
+  let bestPortfoliosFromChunks :: [Portfolio]
+      bestPortfoliosFromChunks = withStrategy (parList rdeepseq) (map processChunk wsChunks)
+  
+  return $ foldl' (\acc p -> if portfolioSharpe p > portfolioSharpe acc then p else acc) initialPortfolio bestPortfoliosFromChunks
 
 main :: IO ()
 main = do
@@ -162,7 +179,7 @@ main = do
       where
         tryPortfolio :: V.Vector (U.Vector Float) -> Portfolio -> [Int] -> IO Portfolio
         tryPortfolio covMatrix currentBest selectedIdx = do
-          let numTrials = 1000
+          let numTrials = 100
           weightSets <- generateMultipleWeightSets numTrials portfolioSize
           !candidate <- evaluateWeightSets stockVec covMatrix selectedIdx weightSets
           return $ if portfolioSharpe candidate > portfolioSharpe currentBest then candidate else currentBest

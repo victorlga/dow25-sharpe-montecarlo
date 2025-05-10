@@ -27,6 +27,12 @@ executable dow25-sharpe-montecarlo
     , cassava
     , vector
     , random
+    , parallel
+    , split
+    , deepseq
   default-extensions:
     BangPatterns
-  ghc-options: -O3
+    DeriveGeneric
+  ghc-options:
+    -O3
+    -threaded
