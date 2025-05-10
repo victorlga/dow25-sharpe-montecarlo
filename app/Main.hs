@@ -1,65 +1,96 @@
+-- |
+-- Module      : Main
+-- Description : Portfolio optimization using Sharpe ratio
+--
+-- This program processes stock price data, calculates various metrics,
+-- and finds the optimal portfolio weights that maximize the Sharpe ratio.
 module Main where
 
-import Control.Monad (foldM, replicateM)
 import Control.DeepSeq (NFData)
+import Control.Monad (foldM, replicateM)
+import Control.Parallel.Strategies (parList, rdeepseq, withStrategy)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
   ( FromRecord (parseRecord),
     HasHeader (NoHeader),
     decode,
-    parseField,
+    parseField
   )
 import Data.List (transpose)
 import Data.List.Split (chunksOf)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U
-import System.IO (IOMode (ReadMode), withFile)
-import System.Random (randomRIO)
-import Control.Parallel.Strategies (withStrategy, parList, rdeepseq)
 import GHC.Conc (getNumCapabilities)
 import GHC.Generics (Generic)
+import System.IO (IOMode (ReadMode), withFile)
+import System.Random (randomRIO)
 
+--------------------------------------------------------------------------------
+-- Types
+--------------------------------------------------------------------------------
+
+-- | Stock ticker symbol
 type Ticker = BS.ByteString
 
+-- | Day-to-day return percentage
 type DailyReturn = Float
 
+-- | Portfolio performance metric (return/risk)
 type SharpeRatio = Float
 
+-- | Portfolio allocation percentage for a stock
 type Weight = Float
 
+-- | Stock price
 type Price = Float
 
+-- | Represents a stock with its ticker and historical daily returns
 data Stock = Stock
-  { stockTicker :: !Ticker,
-    stockReturns :: ![DailyReturn]
+  { stockTicker :: !Ticker,     -- ^ The stock's ticker symbol
+    stockReturns :: ![DailyReturn]  -- ^ List of historical daily returns
   }
   deriving (Show)
 
+-- | Represents a portfolio with performance metrics and composition
 data Portfolio = Portfolio
-  { portfolioSharpe :: SharpeRatio,
-    portfolioWeights :: [Weight],
-    portfolioTickers :: [Ticker]
+  { portfolioSharpe :: SharpeRatio,   -- ^ The portfolio's Sharpe ratio (higher is better)
+    portfolioWeights :: [Weight],      -- ^ Weight allocation for each stock
+    portfolioTickers :: [Ticker]       -- ^ List of stock tickers in the portfolio
   }
   deriving (Show, Generic)
 
-instance NFData Portfolio
+instance NFData Portfolio  -- For parallel evaluation
 
+--------------------------------------------------------------------------------
+-- Constants
+--------------------------------------------------------------------------------
+
+-- | Path to the CSV file containing historical stock prices
 csvFilePath :: String
 csvFilePath = "data/dow_jones_close_prices_aug_dec_2024.csv"
 
-generateIndexCombinations :: Int -> [a] -> [[a]]
-generateIndexCombinations k xs = go k xs []
-  where
-    go 0 _ acc = [acc]
-    go _ [] _ = []
-    go n (y : ys) acc = go (n - 1) ys (y : acc) ++ go n ys acc
+-- | Number of trading days in a year, used for annualization
+daysPerYear :: Float
+daysPerYear = 252
 
-calculateDailyReturns :: [Price] -> [DailyReturn]
-calculateDailyReturns [] = []
-calculateDailyReturns [_] = []
-calculateDailyReturns (p0:p1:ps) = (p1 - p0) / p0 : calculateDailyReturns (p1:ps)
+-- | Maximum allowed weight for any single stock in the portfolio
+maxAllowedWeight :: Float
+maxAllowedWeight = 0.2
 
+-- | Number of Monte Carlo trials per portfolio combination
+numTrials :: Int
+numTrials = 1000
+
+-- | Size of portfolios to generate
+portfolioSize :: Int
+portfolioSize = 25
+
+--------------------------------------------------------------------------------
+-- CSV Parsing
+--------------------------------------------------------------------------------
+
+-- | Parse a CSV record into a Stock
 instance FromRecord Stock where
   parseRecord v = do
     prices <- mapM (parseField . (v V.!)) [1 .. V.length v - 1]
@@ -67,15 +98,28 @@ instance FromRecord Stock where
         returns = calculateDailyReturns prices
     pure $ Stock ticker returns
 
+-- | Load and parse stock data from the CSV file
 loadStockCsvData :: IO (Either String (V.Vector Stock))
 loadStockCsvData = do
   withFile csvFilePath ReadMode $ \handle -> do
     csvData <- BS.hGetContents handle
     return $ decode NoHeader (BL.fromStrict csvData)
 
-average :: [Float] -> Float
-average xs = if null xs then 0 else foldl (+) 0 xs / fromIntegral (length xs)
+--------------------------------------------------------------------------------
+-- Financial Calculations
+--------------------------------------------------------------------------------
 
+-- | Convert a sequence of prices to daily returns
+calculateDailyReturns :: [Price] -> [DailyReturn]
+calculateDailyReturns [] = []
+calculateDailyReturns [_] = []
+calculateDailyReturns (p0:p1:ps) = (p1 - p0) / p0 : calculateDailyReturns (p1:ps)
+
+-- | Calculate the arithmetic mean of a list of numbers
+average :: [Float] -> Float
+average xs = if null xs then 0 else sum xs / fromIntegral (length xs)
+
+-- | Calculate covariance between two time series
 calculateCovariance :: [Float] -> [Float] -> Float
 calculateCovariance xs ys
   | null xs || null ys || length xs == 1 = 0
@@ -84,35 +128,66 @@ calculateCovariance xs ys
           my = average ys
           n = fromIntegral (length xs)
           products = zipWith (\x y -> (x - mx) * (y - my)) xs ys
-       in foldl (+) 0 products / (n - 1)
+       in sum products / (n - 1)
 
+-- | Compute the full covariance matrix for multiple return series
 computeCovarianceMatrix :: V.Vector [DailyReturn] -> V.Vector (U.Vector Float)
 computeCovarianceMatrix returnsVec =
   V.generate n (\i -> U.generate n (\j -> calculateCovariance (returnsVec V.! i) (returnsVec V.! j)))
   where
     n = V.length returnsVec
 
-evaluatePortfolio :: [[DailyReturn]] -> V.Vector (U.Vector Float) -> [Weight] -> (Float, Float)
-evaluatePortfolio timeSeries covarianceMatrix weights =
+-- | Apply weights to a set of daily returns
+applyWeights :: [Weight] -> [DailyReturn] -> Float
+applyWeights ws rs = sum (zipWith (*) ws rs)
+
+-- | Calculate portfolio variance given weights and a covariance matrix
+calculatePortfolioVariance :: V.Vector (U.Vector Float) -> [Weight] -> Float
+calculatePortfolioVariance covarianceMatrix weights = 
+  let n = length weights
+  in sum [weights !! i * sum [covarianceMatrix V.! i U.! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
+
+-- | Calculate annualized portfolio standard deviation
+calculatePortfolioStdDev :: Float -> Float
+calculatePortfolioStdDev portfolioVariance =
+  if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysPerYear
+
+-- | Calculate annualized return for a weighted portfolio
+calculateAnnualizedReturn :: [[DailyReturn]] -> [Weight] -> Float
+calculateAnnualizedReturn timeSeries weights =
   let weightedReturnsOverTime = map (applyWeights weights) timeSeries
       avgDailyReturn = average weightedReturnsOverTime
-      daysPerYear = 252 :: Float
-      annualizedReturn = avgDailyReturn * daysPerYear
+  in avgDailyReturn * daysPerYear
 
-      n = length weights
-      portfolioVariance = sum [weights !! i * sum [covarianceMatrix V.! i U.! j * weights !! j | j <- [0 .. n - 1]] | i <- [0 .. n - 1]]
-      portfolioStdDev = if portfolioVariance <= 0 then 0 else sqrt portfolioVariance * sqrt daysPerYear
+-- | Calculate annualized return and standard deviation for a portfolio
+evaluatePortfolio :: [[DailyReturn]] -> V.Vector (U.Vector Float) -> [Weight] -> (Float, Float)
+evaluatePortfolio timeSeries covarianceMatrix weights =
+  let annualizedReturn = calculateAnnualizedReturn timeSeries weights
+      portfolioVariance = calculatePortfolioVariance covarianceMatrix weights
+      portfolioStdDev = calculatePortfolioStdDev portfolioVariance
    in (annualizedReturn, portfolioStdDev)
-  where
-    applyWeights :: [Weight] -> [DailyReturn] -> Float
-    applyWeights ws rs = sum (zipWith (*) ws rs)
 
+-- | Calculate Sharpe ratio from annualized return and standard deviation
 calculateSharpeRatio :: Float -> Float -> SharpeRatio
 calculateSharpeRatio annualReturn stdDev =
   if stdDev <= 0
     then 0
     else annualReturn / stdDev
 
+--------------------------------------------------------------------------------
+-- Portfolio Generation
+--------------------------------------------------------------------------------
+
+-- | Generate all possible combinations of k elements from a list
+generateIndexCombinations :: Int -> [a] -> [[a]]
+generateIndexCombinations k xs = go k xs []
+  where
+    go 0 _ acc = [acc]
+    go _ [] _ = []
+    go n (y : ys) acc = go (n - 1) ys (y : acc) ++ go n ys acc
+
+-- | Generate a set of random portfolio weights that sum to 1.0
+-- and respect the maximum weight constraint
 generateNormalizedWeights :: Int -> IO [Weight]
 generateNormalizedWeights n = do
   trySample
@@ -121,65 +196,140 @@ generateNormalizedWeights n = do
       rawWeights <- replicateM n (randomRIO (0, 1))
       let total = max (sum rawWeights) 1e-10
           normalized = map (/ total) rawWeights
-          maxAllowedWeight = 0.2
       if any (> maxAllowedWeight) normalized
         then trySample
         else pure normalized
 
+-- | Generate multiple sets of portfolio weights
 generateMultipleWeightSets :: Int -> Int -> IO [[Weight]]
 generateMultipleWeightSets trials n = replicateM trials (generateNormalizedWeights n)
 
+--------------------------------------------------------------------------------
+-- Optimization Functions
+--------------------------------------------------------------------------------
+
+-- | Extract selected stocks from the full vector
+extractSelectedStocks :: V.Vector Stock -> [Int] -> [Stock]
+extractSelectedStocks stockVec selectedIdx = map (stockVec V.!) selectedIdx
+
+-- | Extract the covariance submatrix for selected stocks
+extractSelectedCovMatrix :: V.Vector (U.Vector Float) -> [Int] -> V.Vector (U.Vector Float)
+extractSelectedCovMatrix covMatrix selectedIdx = 
+  let selectedIdxVec = U.fromList selectedIdx
+  in V.generate (length selectedIdx) $ \i ->
+       U.generate (length selectedIdx) $ \j ->
+         covMatrix V.! (selectedIdxVec U.! i) U.! (selectedIdxVec U.! j)
+
+-- | Evaluate a single weight set and determine if it's better than the current best
+testWeightSet :: [[DailyReturn]] -> V.Vector (U.Vector Float) -> [Ticker] -> Portfolio -> [Weight] -> Portfolio
+testWeightSet timeSeries covMatrix tickers bestSoFar weights =
+  let (annReturn, stdDev) = evaluatePortfolio timeSeries covMatrix weights
+      sharpe = calculateSharpeRatio annReturn stdDev
+   in if sharpe > portfolioSharpe bestSoFar
+        then Portfolio sharpe weights tickers
+        else bestSoFar
+
+-- | Process a chunk of weight sets to find the best performing one
+processWeightChunk :: [[DailyReturn]] -> V.Vector (U.Vector Float) -> [Ticker] -> Portfolio -> [[Weight]] -> Portfolio
+processWeightChunk timeSeries covMatrix tickers initialPortfolio chunk = 
+  foldl (testWeightSet timeSeries covMatrix tickers) initialPortfolio chunk
+
+-- | Distribute weight sets processing across multiple cores
+distributeWeightSetProcessing :: [[DailyReturn]] -> V.Vector (U.Vector Float) -> [Ticker] -> [[Weight]] -> IO Portfolio
+distributeWeightSetProcessing timeSeries covMatrix tickers weightSets = do
+  numCaps <- getNumCapabilities
+  let numWeightSets = length weightSets
+      chunkSize = max 1 (numWeightSets `div` numCaps)  -- Ensure chunkSize is at least 1 to prevent empty chunks
+      wsChunks = chunksOf chunkSize weightSets
+      
+      initialPortfolio = Portfolio (negate infinity) [] tickers
+      infinity = 1.0/0.0 :: Float
+      
+      processChunk :: [[Weight]] -> Portfolio
+      processChunk chunk = processWeightChunk timeSeries covMatrix tickers initialPortfolio chunk
+      
+      bestPortfoliosFromChunks :: [Portfolio]
+      bestPortfoliosFromChunks = withStrategy (parList rdeepseq) (map processChunk wsChunks)
+  
+  return $ foldl (\acc p -> if portfolioSharpe p > portfolioSharpe acc then p else acc) initialPortfolio bestPortfoliosFromChunks
+
+-- | Evaluate multiple weight sets for a portfolio and find the best
 evaluateWeightSets :: V.Vector Stock -> V.Vector (U.Vector Float) -> [Int] -> [[Weight]] -> IO Portfolio
 evaluateWeightSets stockVec covMatrix selectedIdx weightSets = do
-  let selectedStocks = map (stockVec V.!) selectedIdx
+  let selectedStocks = extractSelectedStocks stockVec selectedIdx
       tickers = map stockTicker selectedStocks
       returns = map stockReturns selectedStocks
       timeSeries = transpose returns
-      selectedIdxVec = U.fromList selectedIdx
-      selectedCovMatrix = V.generate (length selectedIdx) $ \i ->
-                          U.generate (length selectedIdx) $ \j ->
-                            covMatrix V.! (selectedIdxVec U.! i) U.! (selectedIdxVec U.! j)
-
-      testWeightSet bestSoFar weights =
-        let (annReturn, stdDev) = evaluatePortfolio timeSeries selectedCovMatrix weights
-            sharpe = calculateSharpeRatio annReturn stdDev
-         in if sharpe > portfolioSharpe bestSoFar
-              then Portfolio sharpe weights tickers
-              else bestSoFar
-
-  numCaps <- getNumCapabilities
-  let numWeightSets = length weightSets
-      chunkSize = max 1 (numWeightSets `div` numCaps)  -- Ensure chunkSize is at least 1
-      wsChunks = chunksOf chunkSize weightSets
+      selectedCovMatrix = extractSelectedCovMatrix covMatrix selectedIdx
   
-  let initialPortfolio = Portfolio (-1.0/0.0) [] tickers
-  let processChunk :: [[Weight]] -> Portfolio
-      processChunk chunk = foldl' testWeightSet initialPortfolio chunk
+  distributeWeightSetProcessing timeSeries selectedCovMatrix tickers weightSets
 
-  let bestPortfoliosFromChunks :: [Portfolio]
-      bestPortfoliosFromChunks = withStrategy (parList rdeepseq) (map processChunk wsChunks)
+-- | Generate weight sets for a portfolio combination
+generatePortfolioWeightSets :: Int -> IO [[Weight]]
+generatePortfolioWeightSets size = generateMultipleWeightSets numTrials size
+
+-- | Compare two portfolios and return the one with higher Sharpe ratio
+selectBetterPortfolio :: Portfolio -> Portfolio -> Portfolio
+selectBetterPortfolio p1 p2 = 
+  if portfolioSharpe p1 > portfolioSharpe p2 then p1 else p2
+
+-- | Try a specific portfolio combination and update the best if better
+tryPortfolio :: V.Vector Stock -> V.Vector (U.Vector Float) -> Portfolio -> [Int] -> IO Portfolio
+tryPortfolio stockVec covMatrix currentBest selectedIdx = do
+  weightSets <- generatePortfolioWeightSets portfolioSize
+  !candidate <- evaluateWeightSets stockVec covMatrix selectedIdx weightSets
+  return $ selectBetterPortfolio candidate currentBest
+
+--------------------------------------------------------------------------------
+-- Main Program
+--------------------------------------------------------------------------------
+
+-- | Create negative infinity value for initial portfolio comparison
+negativeInfinity :: Float
+negativeInfinity = negate (1.0/0.0)
+
+-- | Initialize an empty portfolio with negative infinity Sharpe ratio
+createEmptyPortfolio :: Portfolio
+createEmptyPortfolio = Portfolio negativeInfinity [] []
+
+-- | Handle the optimization process
+runOptimization :: V.Vector Stock -> IO Portfolio
+runOptimization stockVec = do
+  putStrLn $ "Loaded " ++ show (V.length stockVec) ++ " stocks."
+  putStrLn $ "Optimizing for portfolios of size " ++ show portfolioSize
+
+  let allCombinations = generateIndexCombinations portfolioSize [0 .. V.length stockVec - 1]
+      covMatrix = computeCovarianceMatrix (V.map stockReturns stockVec)
+      initialBest = createEmptyPortfolio
+
+  putStrLn $ "Testing " ++ show (length allCombinations) ++ " portfolio combinations."
+  putStrLn $ "Running " ++ show numTrials ++ " Monte Carlo trials per combination."
   
-  return $ foldl' (\acc p -> if portfolioSharpe p > portfolioSharpe acc then p else acc) initialPortfolio bestPortfoliosFromChunks
+  foldM (tryPortfolio stockVec covMatrix) initialBest allCombinations
 
+-- | Display the portfolio results
+displayPortfolioResults :: Portfolio -> IO ()
+displayPortfolioResults portfolio = do
+  putStrLn $ "\nBest portfolio found:"
+  putStrLn $ "- Sharpe Ratio: " ++ show (portfolioSharpe portfolio)
+  putStrLn $ "- Stock Count: " ++ show (length $ portfolioTickers portfolio)
+  putStrLn $ "- Sum of weights: " ++ show (sum $ portfolioWeights portfolio)
+  
+  putStrLn "\nPortfolio composition:"
+  let weightedTickers = zip (portfolioTickers portfolio) (portfolioWeights portfolio)
+      formatWeight weight = show (weight * 100) ++ "%"
+      formatTicker ticker weight = "  " ++ show ticker ++ ": " ++ formatWeight weight
+  
+  mapM_ (uncurry formatTicker >>> putStrLn) weightedTickers
+  where
+    (>>>) f g = \x -> g (f x)
+
+-- | Main program entry point
 main :: IO ()
 main = do
   stockData <- loadStockCsvData
-  let portfolioSize = 25
   case stockData of
     Left err -> putStrLn $ "Error parsing CSV: " ++ err
     Right stockVec -> do
-      let allCombinations = generateIndexCombinations portfolioSize [0 .. V.length stockVec - 1]
-          covMatrix = computeCovarianceMatrix (V.map stockReturns stockVec)
-          initialBest = Portfolio (-1) [] []
-
-      bestPortfolio <- foldM (\best idxs -> tryPortfolio covMatrix best idxs) initialBest allCombinations
-
-      putStrLn $ "\nBest portfolio: " ++ show bestPortfolio
-      putStrLn $ "\nSum of weights: " ++ show (sum $ portfolioWeights bestPortfolio)
-      where
-        tryPortfolio :: V.Vector (U.Vector Float) -> Portfolio -> [Int] -> IO Portfolio
-        tryPortfolio covMatrix currentBest selectedIdx = do
-          let numTrials = 100
-          weightSets <- generateMultipleWeightSets numTrials portfolioSize
-          !candidate <- evaluateWeightSets stockVec covMatrix selectedIdx weightSets
-          return $ if portfolioSharpe candidate > portfolioSharpe currentBest then candidate else currentBest
+      bestPortfolio <- runOptimization stockVec
+      displayPortfolioResults bestPortfolio
