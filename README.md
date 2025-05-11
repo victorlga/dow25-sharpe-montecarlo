@@ -15,7 +15,7 @@
 - [Input Data](#input-data)
 - [Output](#output)
 - [Project Structure](#project-structure)
-- [Development Notes](#development-notes)
+- [AI Usage Disclosure](#ai-usage-disclosure)
 
 ## Overview
 
@@ -195,13 +195,6 @@ dow25-sharpe-montecarlo/
 └── README.md            # This file
 ```
 
-## Development Notes
+## AI Usage Disclosure
 
-This project was developed with a focus on both performance and code clarity. The codebase was reviewed and enhanced using Claude.ai to improve code organization, documentation, and performance characteristics.
-
-Key development decisions:
-- Choosing Haskell as a learning opportunity to explore functional programming concepts
-- Implementing strict evaluation patterns to optimize numeric computations
-- Leveraging parallelism to handle the computationally intensive nature of portfolio optimization
-
-The architecture aims to be scalable, allowing for future enhancements such as additional optimization methods, different objective functions, or more sophisticated constraints.
+The codebase was reviewed and enhanced using Claude.ai to improve code organization, documentation, and performance characteristics.
