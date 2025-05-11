@@ -1,8 +1,207 @@
-# dow25-sharpe-montecarlo
+# Dow25 Sharpe Ratio Portfolio Optimizer
 
-### 🛠 Build and run
+## Table of Contents
+- [Overview](#overview)
+- [Project Description](#project-description)
+  - [Key Components](#key-components)
+  - [Optimization Strategy](#optimization-strategy)
+  - [Parallel Processing Approach](#parallel-processing-approach)
+  - [Performance Considerations](#performance-considerations)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Running with Cabal](#running-with-cabal)
+  - [Running with VS Code Dev Container](#running-with-vs-code-dev-container)
+- [Configuration Options](#configuration-options)
+- [Input Data](#input-data)
+- [Output](#output)
+- [Project Structure](#project-structure)
+- [Development Notes](#development-notes)
+
+## Overview
+
+This Haskell application performs portfolio optimization using Monte Carlo simulation to find the combination of Dow Jones stocks that maximizes the Sharpe ratio. The program processes historical price data (from August to December 2024), calculates financial metrics, and leverages parallel computing to efficiently search the solution space.
+
+## Project Description
+
+The portfolio optimizer finds the optimal allocation of weights across a selection of Dow Jones stocks to maximize risk-adjusted returns, as measured by the Sharpe ratio. The Sharpe ratio measures excess return per unit of risk, making it an ideal metric for portfolio optimization.
+
+### Key Components
+
+The program follows these high-level steps:
+
+1. **Data Loading**: Parses a CSV file containing historical stock prices of Dow Jones components
+2. **Return Calculation**: Converts price data into daily returns for each stock
+3. **Covariance Computation**: Creates a covariance matrix to capture price movement relationships
+4. **Portfolio Generation**: Uses a divide-and-conquer strategy to:
+   - Generate all possible combinations of stocks (subsets of the Dow Jones index)
+   - For each combination, create multiple weight allocations using Monte Carlo simulation
+   - Evaluate each portfolio's Sharpe ratio
+5. **Optimization**: Tracks and returns the portfolio with the highest Sharpe ratio
+
+### Optimization Strategy
+
+The portfolio optimization problem involves:
+- Selecting a subset of stocks from the Dow Jones index (portfolio size defined as 25)
+- Determining the optimal weight allocation for each stock in the portfolio
+- Maximizing the Sharpe ratio while respecting constraints (e.g., maximum weight per stock)
+
+The program explores a large solution space using:
+1. Combinatorial generation of all possible stock subsets of the specified size
+2. Monte Carlo simulation to generate random weight allocations for each combination
+3. Parallel evaluation of portfolios to find the global optimum
+
+### Parallel Processing Approach
+
+The application uses Haskell's parallel processing capabilities to accelerate computation. The key parallelization decision was to:
+
+**Parallelize by weight sets rather than stock combinations**
+
+Each stock combination shares the same underlying data (returns, covariance matrix). By parallelizing the weight set evaluations within each combination, we:
+- Minimize data duplication across threads
+- Reduce memory overhead by not replicating the same return data and covariance matrices
+- Achieve better load balancing as weight set evaluations have similar computational costs
+
+This approach distributes chunks of Monte Carlo trials across available CPU cores, with each core handling the complete evaluation of several weight sets for a given stock combination.
+
+### Performance Considerations
+
+The code extensively uses strict evaluation (via bang patterns and forced evaluation) to avoid thunk buildup, which is critical for numeric computations in Haskell. Key performance optimizations include:
+
+- **Strict Evaluation**: Using `!` bang patterns to force evaluation of intermediate calculations
+- **Parallelization**: Leveraging `parList` and `rdeepseq` for parallel processing
+- **Memory Efficiency**: Carefully managing data structures to prevent excessive memory usage
+- **Unboxed Vectors**: Using unboxed vectors for numeric calculations where appropriate
+- **GHC Optimizations**: Compiling with `-O3` and `-threaded` flags
+
+## Installation
+
+### Prerequisites
+
+- GHC (Glasgow Haskell Compiler) 9.12.2 or later
+- Cabal 3.0 or later
+- Required Haskell packages (automatically installed via Cabal):
+  - bytestring
+  - cassava
+  - vector
+  - random
+  - parallel
+  - split
+  - deepseq
+
+### Setting Up
+
+Clone the repository:
 
 ```bash
-cabal clean
-cabal run dow25-sharpe-montecarlo -- +RTS -N4 -RTS
+git clone https://github.com/victorlga/dow25-sharpe-montecarlo
+cd dow25-sharpe-montecarlo
 ```
+
+## Usage
+
+### Running with Cabal
+
+1. Update Cabal package database:
+```bash
+cabal update
+```
+
+2. Build the project:
+```bash
+cabal build
+```
+
+3. Run the optimizer:
+```bash
+cabal run
+```
+
+4. (Optional) Specify the number of cores to use:
+```bash
+cabal run -- +RTS -N4 -RTS
+```
+
+### Running with VS Code Dev Container
+
+The project includes a Dev Container configuration for VS Code, providing a consistent development environment:
+
+1. Install the "Remote - Containers" extension in VS Code
+2. Open the project folder in VS Code
+3. Click on the green button in the bottom-left corner and select "Reopen in Container"
+4. Once the container is built and running, open a terminal in VS Code
+5. Run the project using Cabal commands as described above
+
+## Configuration Options
+
+The following constants can be modified in the source code:
+
+- `csvFilePath`: Path to the CSV file containing historical stock prices
+- `daysPerYear`: Trading days in a year, used for annualization (default: 252)
+- `maxAllowedWeight`: Maximum allocation percentage for any single stock (default: 0.2 or 20%)
+- `numTrials`: Number of Monte Carlo simulations per portfolio combination (default: 1000)
+- `portfolioSize`: Number of stocks to include in each portfolio (default: 25)
+
+## Input Data
+
+The program expects a CSV file with historical stock prices in the following format:
+- First column: Stock ticker symbol
+- Subsequent columns: Daily closing prices from August 1, 2024, to December 31, 2024
+
+The file should be placed in the `data/` directory with the name specified in `csvFilePath`.
+
+## Output
+
+The program outputs:
+- A summary of the optimization process
+- The best portfolio found with its Sharpe ratio
+- The weight allocation for each stock in the optimal portfolio
+
+Example output:
+```
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.1846533
+- Stock Count: 25
+- Sum of weights: 1.0000000
+
+Portfolio composition:
+  AAPL: 8.2%
+  MSFT: 12.5%
+  ...
+```
+
+## Project Structure
+
+```
+dow25-sharpe-montecarlo/
+│
+├── app/
+│   └── Main.hs           # Main application code
+│
+├── data/
+│   └── dow_jones_close_prices_aug_dec_2024.csv  # Stock price data
+│
+├── .devcontainer/        # VS Code Dev Container configuration
+│   ├── Dockerfile
+│   └── devcontainer.json
+│
+├── dow25-sharpe-montecarlo.cabal  # Package description
+├── LICENSE               # License information
+└── README.md            # This file
+```
+
+## Development Notes
+
+This project was developed with a focus on both performance and code clarity. The codebase was reviewed and enhanced using Claude.ai to improve code organization, documentation, and performance characteristics.
+
+Key development decisions:
+- Choosing Haskell as a learning opportunity to explore functional programming concepts
+- Implementing strict evaluation patterns to optimize numeric computations
+- Leveraging parallelism to handle the computationally intensive nature of portfolio optimization
+
+The architecture aims to be scalable, allowing for future enhancements such as additional optimization methods, different objective functions, or more sophisticated constraints.
