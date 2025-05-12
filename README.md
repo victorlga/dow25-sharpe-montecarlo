@@ -8,6 +8,8 @@
   - [Parallel Processing Approach](#parallel-processing-approach)
   - [Performance Considerations](#performance-considerations)
 - [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Setting Up](#setting-up)
 - [Usage](#usage)
   - [Running with Cabal](#running-with-cabal)
   - [Running with VS Code Dev Container](#running-with-vs-code-dev-container)
@@ -15,6 +17,9 @@
 - [Input Data](#input-data)
 - [Output](#output)
 - [Project Structure](#project-structure)
+- [Results] (#results)
+  - [Parallel Processing Performance Analysis](#parallel-processing-performance-analysis)
+  - [2024 vs 2025 Sharpe Comparison]
 - [AI Usage Disclosure](#ai-usage-disclosure)
 
 ## Overview
@@ -182,9 +187,12 @@ dow25-sharpe-montecarlo/
 │
 ├── app/
 │   └── Main.hs           # Main application code
+│   └── Simulator.hs           # Simulation application code
+│   └── DataLoader.hs           # Data loading application code
 │
 ├── data/
-│   └── dow_jones_close_prices_aug_dec_2024.csv  # Stock price data
+│   └── dow_jones_close_prices_aug_dec_2024.csv  # 2024 stock price data
+│   └── dow_jones_close_prices_jan_mar_2025.csv  # 2025 stock price data
 │
 ├── .devcontainer/        # VS Code Dev Container configuration
 │   ├── Dockerfile
@@ -194,6 +202,53 @@ dow25-sharpe-montecarlo/
 ├── LICENSE               # License information
 └── README.md            # This file
 ```
+
+## Results
+
+### Parallel Processing Performance Analysis
+
+![Execution Time Comparison](/execution-data/execution_time_comparison_5_10_cores.png)
+
+#### Execution Time Metrics
+
+| Metric | 5 Cores | 10 Cores |
+|--------|---------|----------|
+| Average Execution Time | 33.25 minutes | 32.54 minutes |
+| Speedup | 2.97x | 3.04x |
+| Parallel Efficiency | 59.5% | 30.4% |
+| Time Reduction | 66.4% | 67.1% |
+
+#### Key Observations
+
+1. **Significant Performance Improvement**
+   - Sequential execution averaged 98.83 minutes
+   - Parallel execution with 5 cores reduced time to 33.25 minutes
+   - Parallel execution with 10 cores further reduced time to 32.54 minutes
+
+2. **Speedup Analysis**
+   - 5-core parallel processing achieved a 2.97x speedup
+   - 10-core parallel processing achieved a 3.04x speedup
+
+3. **Efficiency Considerations**
+   - 5-core parallel efficiency: 59.5%
+   - 10-core parallel efficiency: 30.4%
+
+#### Performance Insights
+
+**Parallel Efficiency Analysis**
+
+The performance results reveal critical insights into parallel computing:
+- 5 cores achieved 59.5% efficiency, providing the optimal performance
+- 10 cores showed diminishing returns (30.4% efficiency)
+
+This demonstrates that simply adding more cores does not guarantee proportional speedup. The bottleneck stems from:
+- Limited parallelism in the algorithm's pipeline
+- Increasing overhead of thread management
+- Resource contention as core count increases
+
+**Key Takeaway**: The optimal parallel implementation balances computational work with communication overhead. For this portfolio optimization task, 5 cores represent the sweet spot of performance and efficiency.
+
+
 
 ## AI Usage Disclosure
 

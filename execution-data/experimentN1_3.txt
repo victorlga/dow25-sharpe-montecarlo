@@ -1,0 +1,43 @@
+Executando sem paralelismo (N1)...
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.1341608
+- Stock Count: 25
+- Sum of weights: 1.0
+
+Portfolio composition:
+  "WMT": 9.12242%
+  "VZ": 0.60941666%
+  "V": 4.680144%
+  "TRV": 2.8703635%
+  "PG": 4.3445854%
+  "NVDA": 5.7765827%
+  "NKE": 2.4579043%
+  "MSFT": 0.43694764%
+  "MMM": 9.27112e-2%
+  "MCD": 6.059082%
+  "KO": 0.38576803%
+  "JPM": 7.811676%
+  "JNJ": 1.5214199e-2%
+  "IBM": 7.5320745%
+  "HON": 4.501415%
+  "DIS": 9.172652%
+  "CVX": 0.288071%
+  "CSCO": 5.9520073%
+  "CRM": 6.669206%
+  "CAT": 1.1580942%
+  "BA": 2.6343498%
+  "AXP": 6.982544%
+  "AMZN": 0.5522529%
+  "AMGN": 0.45036152%
+  "AAPL": 9.444161%
+
+real	98m17.309s
+user	98m22.752s
+sys	0m5.177s

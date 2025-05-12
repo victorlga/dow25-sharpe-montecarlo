@@ -1,0 +1,221 @@
+Executando com paralelismo (N10)...
+Execução 1 com -N10
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.124321
+- Stock Count: 25
+- Sum of weights: 0.99999994
+
+Portfolio composition:
+  "WMT": 8.819745%
+  "VZ": 5.693446%
+  "V": 6.8271694%
+  "UNH": 1.3689193%
+  "TRV": 1.730839%
+  "PG": 0.52287906%
+  "NVDA": 1.0558286%
+  "NKE": 3.394308e-2%
+  "MSFT": 0.8744688%
+  "MCD": 7.8078904%
+  "JNJ": 0.20425683%
+  "IBM": 3.071954%
+  "HON": 2.8754046%
+  "HD": 7.7159486%
+  "GS": 2.2768493%
+  "DIS": 8.712747%
+  "CVX": 3.4461486%
+  "CSCO": 8.0764475%
+  "CRM": 9.053735%
+  "CAT": 3.4995694%
+  "BA": 0.72130084%
+  "AXP": 4.371377%
+  "AMZN": 2.4419198%
+  "AMGN": 0.45560533%
+  "AAPL": 8.34161%
+
+real	32m28.611s
+user	147m16.211s
+sys	19m21.982s
+------------------------
+Execução 2 com -N10
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.114802
+- Stock Count: 25
+- Sum of weights: 0.99999994
+
+Portfolio composition:
+  "WMT": 9.9944935%
+  "VZ": 4.781281%
+  "V": 6.5518827%
+  "UNH": 1.2301905%
+  "TRV": 0.6002866%
+  "PG": 10.854508%
+  "NVDA": 6.083916%
+  "NKE": 2.3492794%
+  "MSFT": 0.2897%
+  "MRK": 2.0543702%
+  "MMM": 0.5052058%
+  "MCD": 4.440495%
+  "KO": 1.8382828%
+  "JPM": 3.3662386%
+  "JNJ": 0.93305504%
+  "IBM": 2.4948127%
+  "HON": 0.2913175%
+  "HD": 3.0541456%
+  "DIS": 9.263029%
+  "CVX": 1.7487662%
+  "CSCO": 8.471352%
+  "CRM": 8.138616%
+  "AXP": 6.0816193%
+  "AMZN": 2.042996%
+  "AAPL": 2.5401578%
+
+real	32m44.189s
+user	148m4.789s
+sys	19m35.134s
+------------------------
+Execução 3 com -N10
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.1088603
+- Stock Count: 25
+- Sum of weights: 1.0000001
+
+Portfolio composition:
+  "WMT": 9.61429%
+  "VZ": 7.753621%
+  "V": 2.2460654%
+  "UNH": 2.3561985%
+  "TRV": 6.4850836%
+  "SHW": 9.688835e-2%
+  "PG": 8.127565%
+  "NVDA": 1.2462903%
+  "MMM": 0.124455206%
+  "MCD": 6.322675%
+  "KO": 0.8536214%
+  "JPM": 0.8538127%
+  "IBM": 11.42494%
+  "HD": 2.2096689%
+  "GS": 2.4159093%
+  "DIS": 6.044129%
+  "CVX": 0.29902777%
+  "CSCO": 6.8063445%
+  "CRM": 10.248752%
+  "CAT": 1.0704789%
+  "BA": 2.825556%
+  "AXP": 3.3122547%
+  "AMZN": 2.4711738%
+  "AMGN": 0.1756257%
+  "AAPL": 4.6155844%
+
+real	32m52.532s
+user	148m24.083s
+sys	19m43.545s
+------------------------
+Execução 4 com -N10
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.1366024
+- Stock Count: 25
+- Sum of weights: 1.0
+
+Portfolio composition:
+  "WMT": 8.862795%
+  "VZ": 6.461381%
+  "V": 10.2156925%
+  "UNH": 0.9090199%
+  "PG": 6.0801744%
+  "NVDA": 0.372488%
+  "NKE": 0.89474124%
+  "MRK": 0.41033888%
+  "MCD": 4.041573%
+  "KO": 1.7416097%
+  "JPM": 2.1928592%
+  "JNJ": 0.32816204%
+  "IBM": 6.706835%
+  "HON": 2.4367676%
+  "HD": 6.691501%
+  "GS": 0.6020395%
+  "DIS": 9.568155%
+  "CVX": 1.1800122%
+  "CSCO": 10.292511%
+  "CRM": 9.885623%
+  "BA": 1.3234007%
+  "AXP": 0.42093116%
+  "AMZN": 2.3733604%
+  "AMGN": 2.4118412%
+  "AAPL": 3.5961905%
+
+real	31m43.457s
+user	144m29.638s
+sys	18m42.874s
+------------------------
+Execução 5 com -N10
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
+
+Best portfolio found:
+- Sharpe Ratio: 3.2115421
+- Stock Count: 25
+- Sum of weights: 1.0000001
+
+Portfolio composition:
+  "WMT": 9.330424%
+  "V": 6.181077%
+  "UNH": 1.904576%
+  "TRV": 8.436706%
+  "SHW": 0.6510441%
+  "PG": 3.07206%
+  "NVDA": 1.1757355%
+  "NKE": 0.97747743%
+  "MRK": 0.6875022%
+  "MMM": 2.877401%
+  "MCD": 3.787157%
+  "JPM": 0.80407244%
+  "IBM": 9.661789%
+  "HON": 1.9413799%
+  "HD": 3.2669082%
+  "GS": 1.7611561%
+  "DIS": 9.599678%
+  "CVX": 0.49626124%
+  "CSCO": 9.349205%
+  "CRM": 9.754903%
+  "CAT": 2.18628%
+  "BA": 0.68494415%
+  "AXP": 1.1959642%
+  "AMZN": 5.9045744%
+  "AAPL": 4.311732%
+
+real	32m53.155s
+user	150m9.075s
+sys	19m17.345s
+------------------------

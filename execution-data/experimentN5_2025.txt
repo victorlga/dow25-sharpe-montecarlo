@@ -1,0 +1,34 @@
+Executando com paralelismo (N5)...
+Build profile: -w ghc-9.12.2 -O1
+In order, the following will be built (use -v for more details):
+ - dow25-sharpe-montecarlo-0.1.0.0 (exe:dow25-sharpe-montecarlo) (file app/Main.hs changed)
+Preprocessing executable 'dow25-sharpe-montecarlo' for dow25-sharpe-montecarlo-0.1.0.0...
+Building executable 'dow25-sharpe-montecarlo' for dow25-sharpe-montecarlo-0.1.0.0...
+<no location info>: warning: [GHC-32850] [-Wmissing-home-modules]
+    These modules are needed for compilation but not listed in your .cabal file's other-modules for ‘dow25-sharpe-montecarlo-0.1.0.0-inplace-dow25-sharpe-montecarlo’ :
+        DataLoader Simulator
+
+[3 of 3] Compiling Main             ( app/Main.hs, dist-newstyle/build/aarch64-linux/ghc-9.12.2/dow25-sharpe-montecarlo-0.1.0.0/x/dow25-sharpe-montecarlo/build/dow25-sharpe-montecarlo/dow25-sharpe-montecarlo-tmp/Main.o ) [Source file changed]
+app/Main.hs:10:20: warning: [GHC-77037] [-Wmissing-import-lists]
+    The import item ‘Stock(..)’ does not have an explicit import list
+   |
+10 | import DataLoader (Stock (..), loadStockCsvData)
+   |                    ^^^^^^^^^^
+
+app/Main.hs:13:5: warning: [GHC-77037] [-Wmissing-import-lists]
+    The import item ‘Portfolio(..)’ does not have an explicit import list
+   |
+13 |   ( Portfolio (..),
+   |     ^^^^^^^^^^^^^^
+
+<no location info>: warning: [GHC-32850] [-Wmissing-home-modules]
+    These modules are needed for compilation but not listed in your .cabal file's other-modules for ‘dow25-sharpe-montecarlo-0.1.0.0-inplace-dow25-sharpe-montecarlo’ :
+        DataLoader Simulator
+
+[4 of 4] Linking dist-newstyle/build/aarch64-linux/ghc-9.12.2/dow25-sharpe-montecarlo-0.1.0.0/x/dow25-sharpe-montecarlo/build/dow25-sharpe-montecarlo/dow25-sharpe-montecarlo [Objects changed]
+
+Loaded 30 stocks.
+Optimizing for portfolios of size 25
+
+Testing 142506 portfolio combinations.
+Running 1000 Monte Carlo trials per combination.
