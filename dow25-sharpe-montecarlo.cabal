@@ -20,6 +20,9 @@ common warnings
 executable dow25-sharpe-montecarlo
   import: warnings
   main-is: Main.hs
+  other-modules:
+    DataLoader
+    Simulator
   hs-source-dirs: app
   build-depends:
     , base >= 4.7 && < 5
