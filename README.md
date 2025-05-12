@@ -18,6 +18,7 @@
 - [Output](#output)
 - [Project Structure](#project-structure)
 - [Results](#results)
+  - [Best Portfolio Found](#best-portfolio-found)
   - [Parallel Processing Performance Analysis](#parallel-processing-performance-analysis)
   - [2024 vs 2025 Sharpe Comparison](#2024-vs-2025-sharpe-comparison)
 - [AI Usage Disclosure](#ai-usage-disclosure)
@@ -186,24 +187,75 @@ Portfolio composition:
 dow25-sharpe-montecarlo/
 │
 ├── app/
-│   └── Main.hs           # Main application code
-│   └── Simulator.hs           # Simulation application code
+│   └── Main.hs                 # Main application code
+│   └── Simulator.hs            # Simulation application code
 │   └── DataLoader.hs           # Data loading application code
 │
 ├── data/
 │   └── dow_jones_close_prices_aug_dec_2024.csv  # 2024 stock price data
 │   └── dow_jones_close_prices_jan_mar_2025.csv  # 2025 stock price data
 │
+├── execution-data/
+│   └── execution_time_comparison_5_10_cores.png  # Performance comparisson chart
+│   └── experiment.txt                            # Performance data
+│
 ├── .devcontainer/        # VS Code Dev Container configuration
 │   ├── Dockerfile
 │   └── devcontainer.json
 │
-├── dow25-sharpe-montecarlo.cabal  # Package description
-├── LICENSE               # License information
-└── README.md            # This file
+├── dow25-sharpe-montecarlo.cabal   # Package description
+├── LICENSE                         # License information
+└── README.md                       # This file
 ```
 
 ## Results
+
+### Best Portfolio Found
+
+#### Key Statistics
+- **Sharpe Ratio:** 3.2115
+- **Number of Stocks:** 25
+- **Total Weight:** 100%
+
+#### Top 5 Holdings
+1. **CRM (Salesforce):** 9.75%
+2. **IBM:** 9.66%
+3. **DIS (Disney):** 9.60%
+4. **CSCO (Cisco):** 9.35%
+5. **WMT (Walmart):** 9.33%
+
+#### Full Portfolio Breakdown
+| Ticker | Weight |
+|--------|--------|
+| CRM | 9.75% |
+| IBM | 9.66% |
+| DIS | 9.60% |
+| CSCO | 9.35% |
+| WMT | 9.33% |
+| TRV | 8.44% |
+| AMZN | 5.90% |
+| V | 6.18% |
+| AAPL | 4.31% |
+| HD | 3.27% |
+| MCD | 3.79% |
+| PG | 3.07% |
+| MMM | 2.88% |
+| CAT | 2.19% |
+| UNH | 1.90% |
+| HON | 1.94% |
+| GS | 1.76% |
+| AXP | 1.20% |
+| NVDA | 1.18% |
+| NKE | 0.98% |
+| JPM | 0.80% |
+| MRK | 0.69% |
+| BA | 0.68% |
+| SHW | 0.65% |
+| CVX | 0.50% |
+
+#### Disclaimer
+- Past performance does not guarantee future results
+- Consult with a financial advisor before making investment decisions
 
 ### Parallel Processing Performance Analysis
 
@@ -228,6 +280,8 @@ This demonstrates that simply adding more cores does not guarantee proportional 
 - Limited parallelism in the algorithm's pipeline
 - Increasing overhead of thread management
 - Resource contention as core count increases
+
+### 2024 vs 2025 Sharpe Comparison
 
 ## AI Usage Disclosure
 
