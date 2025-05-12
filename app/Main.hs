@@ -7,10 +7,10 @@
 module Main where
 
 import Control.Monad (foldM)
-import DataLoader (Stock (..), loadStockCsvData)
+import DataLoader (Stock(stockReturns), loadStockCsvData)
 import qualified Data.Vector as V
 import Simulator
-  ( Portfolio (..),
+  ( Portfolio(portfolioSharpe, portfolioWeights, portfolioTickers),
     computeCovarianceMatrix,
     createEmptyPortfolio,
     generateIndexCombinations,

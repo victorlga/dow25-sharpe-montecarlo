@@ -40,8 +40,8 @@ where
 import Control.DeepSeq (NFData)
 import Control.Monad (replicateM)
 import Control.Parallel.Strategies (parList, rdeepseq, withStrategy)
-import DataLoader (DailyReturn, Stock (..), Ticker)
-import Data.List (maximumBy, transpose)
+import DataLoader (DailyReturn, Stock(stockTicker, stockReturns), Ticker)
+import Data.List (maximumBy, transpose, foldl')
 import Data.List.Split (chunksOf)
 import Data.Ord (comparing)
 import qualified Data.Vector as V
