@@ -218,24 +218,7 @@ dow25-sharpe-montecarlo/
 | Parallel Efficiency | 59.5% | 30.4% |
 | Time Reduction | 66.4% | 67.1% |
 
-#### Key Observations
-
-1. **Significant Performance Improvement**
-   - Sequential execution averaged 98.83 minutes
-   - Parallel execution with 5 cores reduced time to 33.25 minutes
-   - Parallel execution with 10 cores further reduced time to 32.54 minutes
-
-2. **Speedup Analysis**
-   - 5-core parallel processing achieved a 2.97x speedup
-   - 10-core parallel processing achieved a 3.04x speedup
-
-3. **Efficiency Considerations**
-   - 5-core parallel efficiency: 59.5%
-   - 10-core parallel efficiency: 30.4%
-
 #### Performance Insights
-
-**Parallel Efficiency Analysis**
 
 The performance results reveal critical insights into parallel computing:
 - 5 cores achieved 59.5% efficiency, providing the optimal performance
@@ -245,10 +228,6 @@ This demonstrates that simply adding more cores does not guarantee proportional 
 - Limited parallelism in the algorithm's pipeline
 - Increasing overhead of thread management
 - Resource contention as core count increases
-
-**Key Takeaway**: The optimal parallel implementation balances computational work with communication overhead. For this portfolio optimization task, 5 cores represent the sweet spot of performance and efficiency.
-
-
 
 ## AI Usage Disclosure
 
