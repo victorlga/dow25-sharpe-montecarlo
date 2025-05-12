@@ -213,9 +213,10 @@ dow25-sharpe-montecarlo/
 ### Best Portfolio Found
 
 #### Key Statistics
-- **Sharpe Ratio:** 3.2115
 - **Number of Stocks:** 25
-- **Total Weight:** 100%
+- **Annual Return:** 42.61%
+- **Standard Deviation:** 14.68%
+- **Sharpe Ratio:** 3.2115
 
 #### Top 5 Holdings
 1. **CRM (Salesforce):** 9.75%
@@ -282,6 +283,23 @@ This demonstrates that simply adding more cores does not guarantee proportional 
 - Resource contention as core count increases
 
 ### 2024 vs 2025 Sharpe Comparison
+
+#### 📈 Performance (Aug–Dec 2024)
+
+* **Annualized Return:** 42.61%
+* **Annualized Standard Deviation:** 13.27%
+* **Sharpe Ratio:** 3.2114
+
+#### 📉 Performance (Jan–Mar 2025)
+
+* **Annualized Return:** –8.14%
+* **Annualized Standard Deviation:** 14.68%
+* **Sharpe Ratio:** –0.5544
+
+#### Interpretation
+
+The portfolio performed exceptionally well during the optimization period in 2024, achieving a very high Sharpe ratio and strong risk-adjusted returns. However, its performance deteriorated significantly in early 2025, showing negative returns and a negative Sharpe ratio.
+
 
 ## AI Usage Disclosure
 
