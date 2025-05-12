@@ -17,9 +17,9 @@
 - [Input Data](#input-data)
 - [Output](#output)
 - [Project Structure](#project-structure)
-- [Results] (#results)
+- [Results](#results)
   - [Parallel Processing Performance Analysis](#parallel-processing-performance-analysis)
-  - [2024 vs 2025 Sharpe Comparison]
+  - [2024 vs 2025 Sharpe Comparison](#2024-vs-2025-sharpe-comparison)
 - [AI Usage Disclosure](#ai-usage-disclosure)
 
 ## Overview
