@@ -119,12 +119,12 @@ cabal build
 
 3. Run the optimizer:
 ```bash
-cabal run
+cabal run dow25-sharpe-montecarlo
 ```
 
 4. (Optional) Specify the number of cores to use:
 ```bash
-cabal run -- +RTS -N4 -RTS
+cabal run dow25-sharpe-montecarlo -- +RTS -N4 -RTS
 ```
 
 ### Running with VS Code Dev Container
