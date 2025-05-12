@@ -13,7 +13,6 @@
 - [Usage](#usage)
   - [Running with Cabal](#running-with-cabal)
   - [Running with VS Code Dev Container](#running-with-vs-code-dev-container)
-- [Configuration Options](#configuration-options)
 - [Input Data](#input-data)
 - [Output](#output)
 - [Project Structure](#project-structure)
@@ -136,16 +135,6 @@ The project includes a Dev Container configuration for VS Code, providing a cons
 3. Click on the green button in the bottom-left corner and select "Reopen in Container"
 4. Once the container is built and running, open a terminal in VS Code
 5. Run the project using Cabal commands as described above
-
-## Configuration Options
-
-The following constants can be modified in the source code:
-
-- `csvFilePath`: Path to the CSV file containing historical stock prices
-- `daysPerYear`: Trading days in a year, used for annualization (default: 252)
-- `maxAllowedWeight`: Maximum allocation percentage for any single stock (default: 0.2 or 20%)
-- `numTrials`: Number of Monte Carlo simulations per portfolio combination (default: 1000)
-- `portfolioSize`: Number of stocks to include in each portfolio (default: 25)
 
 ## Input Data
 
